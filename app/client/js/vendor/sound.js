@@ -1,0 +1,87 @@
+THREE.Sound3D=function(a,b,c,d){
+	THREE.Object3D.call(this);
+	this.isLoaded=!1;
+	this.isAddedToDOM=!1;
+	this.isPlaying=!1;
+	this.duration=-1;
+	this.radius=b!==undefined?Math.abs(b):100;
+	this.volume=Math.min(1,Math.max(0,c!==undefined?c:1));
+	this.domElement=document.createElement("audio");
+	this.domElement.volume=0;
+	this.domElement.pan=0;
+	this.domElement.loop=d!==undefined?d:!0;
+	this.sources=a instanceof Array?a:[a];
+	var f;
+	c=this.sources.length;
+	for(a=0;a<c;a++){
+		b=this.sources[a];
+		b.toLowerCase();
+		if(b.indexOf(".mp3")!==-1)
+			f="audio/mpeg";
+		else if(b.indexOf(".ogg")!==-1)
+			f="audio/ogg";
+		else 
+			b.indexOf(".wav")!==-1&&(f="audio/wav");
+		if(this.domElement.canPlayType(f)){
+			f=document.createElement("source");
+			f.src=this.sources[a];
+			this.domElement.THREESound3D=this;
+			this.domElement.appendChild(f);
+			this.domElement.addEventListener("canplay",this.onLoad,!0);
+			this.domElement.load();
+			break
+		}
+	}
+};
+
+THREE.Sound3D.prototype=new THREE.Object3D;
+THREE.Sound3D.prototype.constructor=THREE.Sound3D;
+THREE.Sound3D.prototype.supr=THREE.Object3D.prototype;
+THREE.Sound3D.prototype.onLoad=function(){
+	var a=this.THREESound3D;
+	if(!a.isLoaded){
+		this.removeEventListener("canplay",this.onLoad,!0);
+		a.isLoaded=!0;
+		a.duration=this.duration;
+		a.isPlaying&&a.play()
+	}
+};
+THREE.Sound3D.prototype.addToDOM=function(a){
+	this.isAddedToDOM=!0;
+	a.appendChild(this.domElement)
+};
+THREE.Sound3D.prototype.play=function(a){
+	this.isPlaying=!0;
+	if(this.isLoaded){
+		this.domElement.play();
+		if(a)
+			this.domElement.currentTime=a%this.duration
+	}
+};
+THREE.Sound3D.prototype.pause=function(){
+	this.isPlaying=!1;
+	this.domElement.pause()
+};
+THREE.Sound3D.prototype.stop=function(){
+	this.isPlaying=!1;
+	this.domElement.pause();
+	this.domElement.currentTime=0
+};
+THREE.Sound3D.prototype.calculateVolumeAndPan=function(a){
+	a=a.length();
+	this.domElement.volume=a<=this.radius?this.volume*(1-a/this.radius):0
+};
+THREE.Sound3D.prototype.update=function(a,b,c){
+	if(this.matrixAutoUpdate){
+		this.localMatrix.setPosition(this.position);
+		b=!0
+	}
+	if(b||this.matrixNeedsUpdate){
+		a?this.globalMatrix.multiply(a,this.localMatrix):this.globalMatrix.copy(this.localMatrix);
+		this.matrixNeedsUpdate=!1;
+		b=!0
+	}
+	var d=this.children.length;
+	for(a=0;a<d;a++)
+		this.children[a].update(this.globalMatrix,b,c)
+};

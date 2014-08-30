@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>Dawn of Infinity</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel=stylesheet href="styles.css"/>
+	<script src="jquery-1.9.1.js"></script>
+	<script src="socket.io/socket.io.js"></script>
+	<script src="three.min.js"></script>
+</head>
+<body>
+
+
+	<div class="login">
+		<h1>Welcome Pilot</h2>
+		<form id="login">
+			<input type="text" id="username" name="username" placeholder="enter your username">
+			<button type="submit">Submit</button>
+		</form>
+	</div>
+
+<div id="testvar" style="position: fixed; left: 10px; top: 10px; color: white; z-index: 100">asdf</div>
+<div id="game" style="position: absolute; left:0; top:0"></div>
+
+<script src="client.js"></script>
+<script src="//localhost:35729/livereload.js"></script>
+
+
+</body>
+</html>

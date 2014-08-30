@@ -1,0 +1,79 @@
+body 
+{
+	font-family: Monospace;
+	font-weight: bold;
+	background-color: #cfcfcf;
+	margin: 0px;
+	overflow: hidden;
+}
+
+body > div.login {
+	font-family: 'Proxima Nova';
+	color: white;
+	margin: 0px auto;
+	width: 635px;
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	margin-left: -318px;
+	margin-top: -50px;
+}
+
+body > div:after {
+	content: "";
+	clear: both;
+	display: block;
+}
+
+#login {
+	display: block;
+	float: left;
+}
+
+h1 {
+	float: left;
+	margin-right: 35px;
+	margin-top: 32px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+}
+
+input {
+	font-family: 'Source Code Pro';
+	font-size: 18px;
+	font-weight: 200;
+	border: 0px;
+	background-color: #bbb;
+	border-radius: 3px;
+	outline: none;
+	color: white;
+	padding: .5em .75em;
+	width: 300px;
+	display: block;
+	margin-bottom: 15px;
+}
+
+button {
+	-webkit-appearance: none;
+	border: none;
+	background: #ededed;
+	color: #bbb;
+	border-radius: 3px;
+	outline: none;
+	font-size: 15px;
+	font-family: 'Source Code Pro';
+	font-weight: 200;
+	padding: .5em .75em;
+	cursor: pointer;
+}
+button:hover { background: white;}
+
+input::-webkit-input-placeholder  { color: white; }
+input:-moz-placeholder  { color: white; }
+input::-moz-placeholder  { color: white; }
+input:-ms-input-placeholder { color: white; }
+
+input:focus::-webkit-input-placeholder  { color: #ddd; }
+input:focus:-moz-placeholder  { color: #ddd; }
+input:focus::-moz-placeholder  { color: #ddd; }
+input:focus:-ms-input-placeholder { color: #ddd; }

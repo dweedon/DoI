@@ -1,0 +1,41 @@
+{
+  "name": "DoI",
+  "version": "0.0.0",
+  "description": "Arcade style space shooter",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Space",
+    "Three.js",
+    "Arcade"
+  ],
+  "author": "David Weedon <weedond@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.4.3",
+    "connect-flash": "^0.1.1",
+    "express": "^4.6.1",
+    "express-session": "^1.6.5",
+    "passport": "^0.2.0",
+    "passport-stormpath": "^0.1.2",
+    "socket.io": "^1.0.6",
+    "stormpath": "^0.4.2",
+    "sys": "0.0.1",
+    "three": "^0.67.0"
+  },
+  "devDependencies": {
+    "browserify": "^4.2.1",
+    "grunt": "^0.4.5",
+    "grunt-browserify": "^2.1.3",
+    "grunt-contrib-clean": "^0.5.0",
+    "grunt-contrib-concat": "^0.4.0",
+    "grunt-contrib-copy": "^0.5.0",
+    "grunt-contrib-jshint": "^0.10.0",
+    "grunt-contrib-qunit": "^0.5.2",
+    "grunt-contrib-uglify": "^0.5.0",
+    "grunt-contrib-watch": "^0.6.1",
+    "remapify": "^0.1.6"
+  }
+}
