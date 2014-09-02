@@ -7,6 +7,7 @@ module.exports = function () {
 		up : keyboard.pressed("up"),
 		left : keyboard.pressed("left"),  
 		right: keyboard.pressed("right"),
-		space : keyboard.pressed("space")
+		space : keyboard.pressed("space"),
+		tab : keyboard.pressed("tab")
 	};
 };

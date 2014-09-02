@@ -34,7 +34,6 @@ function Laser(position, rotation, velocity) {
 Laser.prototype = new THREE.Object3D();
 Laser.prototype.constructor = Laser;
 
-
 Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({ 
 	map: THREE.ImageUtils.loadTexture( "assets/particle.png" ), 
 	transparent: true,
@@ -43,22 +42,17 @@ Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({
 	fog: true 
 });
 
+Laser.prototype.isDead = false;
+
 Laser.prototype.stats = {
 	speed : 40,
 	range : 1,
 	accuracy : 5,
 	dmg : 10
 };
+
 Laser.prototype.timeTraveled = 0;
 
-
-
-
-
-Laser.prototype.destroy = function() {
-
-	this.sprite.visible = false;
-};
 
 module.exports = Laser;
 
@@ -143,6 +137,112 @@ camera.lookAt(new THREE.Vector3(0,0,0)); // Set camera to look at the target
 module.exports = camera;
 },{}],4:[function(require,module,exports){
 
+
+function Explosion() {
+
+	THREE.Sprite.call(this);
+
+  	this.texture = THREE.ImageUtils.loadTexture( "assets/explosion.png" );
+  	this.texture.wrapS = this.texture.wrapT = THREE.RepeatWrapping; 
+  	this.texture.repeat.set(1/5, 1/5);
+
+  	this.currentDisplayTime = 0;
+  	this.currentTile = 0;
+
+  	this.material = new THREE.SpriteMaterial({ 
+		map: this.texture,
+		blending: THREE.AdditiveBlending,
+		fog: true 
+	});
+
+	this.visible = false;
+
+	this.position.z = 2;
+	this.scale.x = 12;
+	this.scale.y = 12;
+	this.scale.z = 12;
+
+	
+	this.startSound = new THREE.Sound3D("assets/explosion.wav", 220, 0.5, false);
+	this.add(this.startSound);
+	
+
+}
+
+Explosion.prototype = new THREE.Sprite(this.material);
+Explosion.prototype.constructor = Explosion;
+
+Explosion.prototype.currentDisplayTime = 0;
+Explosion.prototype.currentTile = 0;
+Explosion.prototype.tileDisplayDuration = 50;
+
+Explosion.prototype.update = function(delta) {
+	
+	this.currentDisplayTime += 1000 * delta;
+	if (this.currentTile == 5) this.startSound.play();
+	while (this.currentDisplayTime > this.tileDisplayDuration)
+	{
+		this.visible = true;
+		this.currentDisplayTime -= this.tileDisplayDuration;
+		this.currentTile++;
+		if (this.currentTile == this.numberOfTiles)
+			this.currentTile = 0;
+		var currentColumn = this.currentTile % 5;
+		this.texture.offset.x = currentColumn / 5;
+
+		var currentRow = Math.floor( this.currentTile / 5 );
+		this.texture.offset.y = 1 - (currentRow / 5);
+	}
+};
+
+module.exports = Explosion;	
+},{}],5:[function(require,module,exports){
+function Healthbar() {
+
+	THREE.Sprite.call(this);
+
+  	this.setHealth = setHealth;
+
+  	this.color = new THREE.Color( "rgb(0,255,0)" );
+
+  	this.map = THREE.ImageUtils.loadTexture( "assets/healthbar.png" );
+  	this.material = new THREE.SpriteMaterial({ 
+		map: this.map,
+		color: this.color
+	});
+
+	this.position.z = 2;
+	this.position.y = 0;
+
+	this.scale.x = 7.5;
+	this.scale.y = 7.5;
+
+
+
+  	function setHealth(health) {
+  		var h = health * 7.5;
+  		this.scale.x = h;
+  		this.material = new THREE.SpriteMaterial({ 
+			map: this.map,
+			color:  this.color.lerp( new THREE.Color( "rgb(255,0,0)" ), 1/h )
+		});
+  	}
+
+
+}
+
+Healthbar.prototype = new THREE.Sprite( 
+	new THREE.SpriteMaterial({ 
+		map: THREE.ImageUtils.loadTexture( "assets/healthbarborder.png" ),
+		blending : THREE.AdditiveBlending
+	})
+);
+
+Healthbar.prototype.constructor = Healthbar;
+
+module.exports = Healthbar;
+},{}],6:[function(require,module,exports){
+
 var THREEx = require('./vendor/THREEx.js');
 var input = require('./input.js');
 
@@ -191,6 +291,8 @@ var init = function() {
 	THREEx.WindowResize(renderer, camera); // Resize game to fit window
 	THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) }); // bind fullscreen mode to 'm' key
 
+
+
 	user = players.addPlayer(1, 'David');
 	players.addPlayer(2, 'NPC');
 	user.camera = camera;
@@ -201,12 +303,24 @@ var init = function() {
 
 var play = function() {
 
-	
-
 	var delta = clock.getDelta();
 	background.update(user.ship.position);
 	camera.update(user.ship.position);
 	lasers.update(delta);
+
+	for ( var id in players.players ) {
+		if ( id == user.id ) continue;
+		players.players[id].update({
+			delta: delta,
+			input: {
+				up: false,
+				left: true,
+				space: false,
+				right: false,
+				tab : false
+			}
+		});
+	}
 	user.update({
 		delta : delta,
 		input : input()
@@ -220,7 +334,10 @@ var play = function() {
 init();
 
 
-},{"./background.js":2,"./camera.js":3,"./input.js":5,"./lasers":7,"./lighting.js":8,"./players.js":10,"./renderer.js":11,"./vendor/THREEx.js":17}],5:[function(require,module,exports){
+
+
+
+},{"./background.js":2,"./camera.js":3,"./input.js":7,"./lasers":9,"./lighting.js":10,"./players.js":12,"./renderer.js":13,"./vendor/THREEx.js":19}],7:[function(require,module,exports){
 
 var KeyboardState = require('./vendor/THREEx.js').KeyboardState;
 var keyboard = new KeyboardState();
@@ -230,13 +347,14 @@ module.exports = function () {
 		up : keyboard.pressed("up"),
 		left : keyboard.pressed("left"),  
 		right: keyboard.pressed("right"),
-		space : keyboard.pressed("space")
+		space : keyboard.pressed("space"),
+		tab : keyboard.pressed("tab")
 	};
 };
 
-},{"./vendor/THREEx.js":17}],6:[function(require,module,exports){
+},{"./vendor/THREEx.js":19}],8:[function(require,module,exports){
 
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 var Laser = require('./Laser.js');
 function lasers (scene) {
 
@@ -255,19 +373,26 @@ function lasers (scene) {
 		while(i > 0) {
 			i--;
 			var laser = this.lasers[i];
+
 			if ( laser.timeTraveled < laser.stats.range ) {
-				// TODO: handle overshooting
-				laser.position.x += delta * laser.velocity.x;
-				laser.position.y += delta * laser.velocity.y;
-				laser.timeTraveled += delta * 1;
-				
-				for ( var id in players.players ) {
-					var ship = players.players[id].ship;
-					var d = laser.position.distanceTo(ship.position);
-				    if (  d < 3 ) 
-				    {
-				    	laser.destroy();
-				    }
+
+				if (!laser.isDead) {
+
+					laser.position.x += delta * laser.velocity.x;
+					laser.position.y += delta * laser.velocity.y;
+					laser.timeTraveled += delta * 1;
+					
+					// Test for Collision with players
+					for ( var id in players.players ) {
+						var ship = players.players[id].ship;
+						var d = laser.position.distanceTo(ship.position);
+					    if ( d < ship.stats.hitBoxRadius ) 
+					    {
+					    	ship.takeDmg(laser.stats.dmg);
+					    	laser.visible = false;
+					    	laser.isDead = true;
+					    }
+					}
 				}
 			}
 			else {
@@ -287,7 +412,7 @@ function lasers (scene) {
 	}
 }
 module.exports = lasers;
-},{"./Laser.js":1}],8:[function(require,module,exports){
+},{"./Laser.js":1}],10:[function(require,module,exports){
 // Player lighting setup
 
 
@@ -314,7 +439,7 @@ lighting.add(key);
 lighting.add(hemiLight);
 
 module.exports = lighting;
-},{}],9:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 var ship = require('./ship.js');
 
 function player(id, name) {
@@ -326,6 +451,8 @@ function player(id, name) {
 player.prototype = {
 
   ship : new ship(),
+
+  isUsersTarget : false,
 
   input : {
     up    : false,
@@ -340,6 +467,34 @@ player.prototype = {
       this.right = false;
       this.space = false;
     }
+  },
+
+  target : null,
+
+  selectTarget : function() {
+    
+    var self = this;
+    var target;
+    if ( this.target === null ) {
+      for ( var ids in players.players ) {
+        target = players.lookup(ids);
+        if ( target !== self ) return target;
+      }
+    } else {
+      target = players.lookup(this.target.id + 1);
+      if ( typeof target !== undefined && target !== this )
+        return target;
+      else 
+        target = players.lookup(0);
+
+      if (target !== user) 
+          return target;
+      else 
+        return players.lookup(1);
+    }
+    this.target = players.lookup(2);
+    this.target.isUsersTarget = true;
+
   },
 
   accelerate : function (delta) {
@@ -378,12 +533,28 @@ player.prototype = {
     }
   },
 
-  updateInput : function() {
-
-  },
-
   update: function(update) {
 
+      if (this.isUsersTarget) {
+        this.ship.healthbar.visible = true;
+      } else {
+        this.ship.healthbar.visible = false;
+      }
+
+      var self = this;
+      if(this.ship.isExploding) {
+        this.ship.explosion.update(update.delta);
+        if( this.ship.explosion.currentTile == 13 ) {
+          this.ship.shipModel.visible = false;
+          setTimeout( function() {
+            players.deletePlayer(self.id);
+          }, 500);
+        }
+      }
+
+      if (update.input.tab) {
+        this.target = this.selectTarget();
+      }
       if (update.input.up) {
         this.accelerate(update.delta);
         //this.ship.thrust.on();
@@ -420,7 +591,7 @@ player.prototype = {
 module.exports = player;
 
 
-},{"./ship.js":13}],10:[function(require,module,exports){
+},{"./ship.js":15}],12:[function(require,module,exports){
 
 var player = require('./player.js');
 
@@ -429,6 +600,7 @@ function players(scene) {
   var self = this;
 
   this.players = {};
+  this.allPlayerShips = [];
 
   this.scene = scene;
 
@@ -446,6 +618,7 @@ function players(scene) {
   function addPlayer(id, name) {
     self.players[id] = new player(id, name);
     self.scene.add(self.players[id].ship);
+    self.allPlayerShips.push(self.players[id].ship);
     return self.players[id];
   }
 }
@@ -454,7 +627,7 @@ module.exports = players;
 
   
 
-},{"./player.js":9}],11:[function(require,module,exports){
+},{"./player.js":11}],13:[function(require,module,exports){
 
 var Detector = require('./vendor/Detector.js');
 
@@ -467,11 +640,12 @@ renderer.setSize(window.innerWidth, window.innerHeight); // set renderer size ba
 renderer.shadowMapEnabled = true; // Shadows allowed
 
 module.exports = renderer;
-},{"./vendor/Detector.js":15}],12:[function(require,module,exports){
+},{"./vendor/Detector.js":17}],14:[function(require,module,exports){
 module.exports = new THREE.Scene();
-},{}],13:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 // Camera setup
-
+var Explosion = require('./explosion.js');
+var Healthbar = require('./healthbar.js');
 
 // Ship Constructor
 function ship() {
@@ -483,6 +657,8 @@ function ship() {
 
   	this.shipModel = new THREE.Mesh();
 
+    this.stats.health = this.stats.startHealth;
+
   	var jsonLoader = new THREE.JSONLoader();
 
     jsonLoader.load( "assets/ship.js", function(geometry, materials) {
@@ -491,10 +667,27 @@ function ship() {
   		_this.shipModel.rotateOnAxis( new THREE.Vector3(1,0,0), Math.PI / 2);
   		_this.add(_this.shipModel);
     });
+
+    this.targeted = false;
+    this.healthbar = new Healthbar();
+    this.add(this.healthbar);
+
+
 }
+
 ship.prototype = new THREE.Object3D();
 ship.prototype.constructor = ship;
-ship.prototype.stats = {  
+
+ship.prototype.explode = function() {
+  this.isExploding = true;
+  this.explosion = new Explosion();
+  this.add(this.explosion);
+};
+ship.prototype.isExploding = false;
+ship.prototype.stats = {
+  startHealth : 300,
+  regen : 1, // Points Per Second  
+  hitBoxRadius    : 2.75,
   turnRate  : 220,  // DEGREES PER SECOND
   accelRate : 35, // METERS PER SECOND PER SECOND
   maxSpeed  : 40,  // METERS PER SECOND
@@ -502,8 +695,23 @@ ship.prototype.stats = {
   bankAngle: 0  // BANKING ANGLE * GRAPHIC EFFECT ONLY *
 };
 
+ship.prototype.takeDmg = function(dmg) {
+  this.stats.health -= dmg;
+  if (this.stats.health >= 0) 
+    this.healthbar.setHealth(this.stats.health/this.stats.startHealth);
+  if (this.stats.health <= 0) {
+    if (!this.isExploding)
+    this.explode();
+  }
+};
+
+
+
+
+
+
 module.exports = ship;
-},{}],14:[function(require,module,exports){
+},{"./explosion.js":4,"./healthbar.js":5}],16:[function(require,module,exports){
 SPARKS = require('./Sparks.js');
 
 (function(){ 
@@ -641,7 +849,7 @@ SPARKS.CanvasShadersUtils.random = random;
 
 
 })(SPARKS);
-},{"./Sparks.js":16}],15:[function(require,module,exports){
+},{"./Sparks.js":18}],17:[function(require,module,exports){
 /**
  * @author alteredq / http://alteredqualia.com/
  * @author mr.doob / http://mrdoob.com/
@@ -702,7 +910,7 @@ module.exports = {
 
 };
 
-},{}],16:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 /*
  * @author zz85 (http://github.com/zz85 http://www.lab4games.net/zz85/blog)
  *
@@ -1620,7 +1828,7 @@ SPARKS.Utils = {
 };
 
 module.exports = SPARKS;
-},{}],17:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 module.exports = {
 
 	KeyboardState : require('./THREEx/KeyboardState.js'),
@@ -1630,9 +1838,379 @@ module.exports = {
 	Sparks : require('./THREEx/Sparks.js'),
 
 	FullScreen : require('./THREEx/FullScreen.js'),
+
+	Domevent : require('./THREEx/Domevent.js')
 	
 };
-},{"./THREEx/FullScreen.js":18,"./THREEx/KeyboardState.js":19,"./THREEx/Sparks.js":20,"./THREEx/WindowResize.js":21}],18:[function(require,module,exports){
+},{"./THREEx/Domevent.js":20,"./THREEx/FullScreen.js":21,"./THREEx/KeyboardState.js":22,"./THREEx/Sparks.js":23,"./THREEx/WindowResize.js":24}],20:[function(require,module,exports){
+// This THREEx helper makes it easy to handle the mouse events in your 3D scene
+//
+// * CHANGES NEEDED
+//   * handle drag/drop
+//   * notify events not object3D - like DOM
+//     * so single object with property
+//   * DONE bubling implement bubling/capturing
+//   * DONE implement event.stopPropagation()
+//   * DONE implement event.type = "click" and co
+//   * DONE implement event.target
+//
+// # Lets get started
+//
+// First you include it in your page
+//
+// ```<script src='threex.domevent.js'></script>```
+//
+// # use the object oriented api
+//
+// You bind an event like this
+// 
+// ```mesh.on('click', function(object3d){ ... })```
+//
+// To unbind an event, just do
+//
+// ```mesh.off('click', function(object3d){ ... })```
+//
+// As an alternative, there is another naming closer DOM events.
+// Pick the one you like, they are doing the same thing
+//
+// ```mesh.addEventListener('click', function(object3d){ ... })```
+// ```mesh.removeEventListener('click', function(object3d){ ... })```
+//
+// # Supported Events
+//
+// Always in a effort to stay close to usual pratices, the events name are the same as in DOM.
+// The semantic is the same too.
+// Currently, the available events are
+// [click, dblclick, mouseup, mousedown](http://www.quirksmode.org/dom/events/click.html),
+// [mouseover and mouse out](http://www.quirksmode.org/dom/events/mouseover.html).
+//
+// # use the standalone api
+//
+// The object-oriented api modifies THREE.Object3D class.
+// It is a global class, so it may be legitimatly considered unclean by some people.
+// If this bother you, simply do ```THREEx.DomEvent.noConflict()``` and use the
+// standalone API. In fact, the object oriented API is just a thin wrapper
+// on top of the standalone API.
+//
+// First, you instanciate the object
+//
+// ```var domEvent = new THREEx.DomEvent();```
+// 
+// Then you bind an event like this
+//
+// ```domEvent.bind(mesh, 'click', function(object3d){ object3d.scale.x *= 2; });```
+//
+// To unbind an event, just do
+//
+// ```domEvent.unbind(mesh, 'click', callback);```
+//
+// 
+// # Code
+
+//
+
+/** @namespace */
+var THREEx    = THREEx    || {};
+
+// # Constructor
+THREEx.DomEvent = function(camera, domElement)
+{
+  this._camera  = camera || null;
+  this._domElement= domElement || document;
+  this._projector = new THREE.Projector();
+  this._selected  = null;
+  this._boundObjs = [];
+
+  // Bind dom event for mouse and touch
+  var _this = this;
+  this._$onClick    = function(){ _this._onClick.apply(_this, arguments);   };
+  this._$onDblClick = function(){ _this._onDblClick.apply(_this, arguments);  };
+  this._$onMouseMove  = function(){ _this._onMouseMove.apply(_this, arguments); };
+  this._$onMouseDown  = function(){ _this._onMouseDown.apply(_this, arguments); };
+  this._$onMouseUp  = function(){ _this._onMouseUp.apply(_this, arguments);   };
+  this._$onTouchMove  = function(){ _this._onTouchMove.apply(_this, arguments); };
+  this._$onTouchStart = function(){ _this._onTouchStart.apply(_this, arguments);  };
+  this._$onTouchEnd = function(){ _this._onTouchEnd.apply(_this, arguments);  };
+  this._domElement.addEventListener( 'click'  , this._$onClick  , false );
+  this._domElement.addEventListener( 'dblclick' , this._$onDblClick , false );
+  this._domElement.addEventListener( 'mousemove'  , this._$onMouseMove  , false );
+  this._domElement.addEventListener( 'mousedown'  , this._$onMouseDown  , false );
+  this._domElement.addEventListener( 'mouseup'  , this._$onMouseUp  , false );
+  this._domElement.addEventListener( 'touchmove'  , this._$onTouchMove  , false );
+  this._domElement.addEventListener( 'touchstart' , this._$onTouchStart , false );
+  this._domElement.addEventListener( 'touchend' , this._$onTouchEnd , false );
+}
+
+// # Destructor
+THREEx.DomEvent.prototype.destroy = function()
+{
+  // unBind dom event for mouse and touch
+  this._domElement.removeEventListener( 'click'   , this._$onClick  , false );
+  this._domElement.removeEventListener( 'dblclick'  , this._$onDblClick , false );
+  this._domElement.removeEventListener( 'mousemove' , this._$onMouseMove  , false );
+  this._domElement.removeEventListener( 'mousedown' , this._$onMouseDown  , false );
+  this._domElement.removeEventListener( 'mouseup'   , this._$onMouseUp  , false );
+  this._domElement.removeEventListener( 'touchmove' , this._$onTouchMove  , false );
+  this._domElement.removeEventListener( 'touchstart'  , this._$onTouchStart , false );
+  this._domElement.removeEventListener( 'touchend'  , this._$onTouchEnd , false );
+}
+
+THREEx.DomEvent.eventNames  = [
+  "click",
+  "dblclick",
+  "mouseover",
+  "mouseout",
+  "mousedown",
+  "mouseup"
+];
+
+/********************************************************************************/
+/*    domevent context            */
+/********************************************************************************/
+
+// handle domevent context in object3d instance
+
+THREEx.DomEvent.prototype._objectCtxInit  = function(object3d){
+  object3d._3xDomEvent = {};
+}
+THREEx.DomEvent.prototype._objectCtxDeinit  = function(object3d){
+  delete object3d._3xDomEvent;
+}
+THREEx.DomEvent.prototype._objectCtxIsInit  = function(object3d){
+  return object3d._3xDomEvent ? true : false;
+}
+THREEx.DomEvent.prototype._objectCtxGet = function(object3d){
+  return object3d._3xDomEvent;
+}
+
+/********************************************************************************/
+/*                    */
+/********************************************************************************/
+
+/**
+ * Getter/Setter for camera
+*/
+THREEx.DomEvent.prototype.camera  = function(value)
+{
+  if( value ) this._camera  = value;
+  return this._camera;
+}
+
+THREEx.DomEvent.prototype.bind  = function(object3d, eventName, callback, useCapture)
+{
+  console.assert( THREEx.DomEvent.eventNames.indexOf(eventName) !== -1, "not available events:"+eventName );
+
+  if( !this._objectCtxIsInit(object3d) )  this._objectCtxInit(object3d);
+  var objectCtx = this._objectCtxGet(object3d); 
+  if( !objectCtx[eventName+'Handlers'] )  objectCtx[eventName+'Handlers'] = [];
+
+  objectCtx[eventName+'Handlers'].push({
+    callback  : callback,
+    useCapture  : useCapture
+  });
+  
+  // add this object in this._boundObjs
+  this._boundObjs.push(object3d);
+}
+
+THREEx.DomEvent.prototype.unbind  = function(object3d, eventName, callback)
+{
+  console.assert( THREEx.DomEvent.eventNames.indexOf(eventName) !== -1, "not available events:"+eventName );
+
+  if( !this._objectCtxIsInit(object3d) )  this._objectCtxInit(object3d);
+
+  var objectCtx = this._objectCtxGet(object3d);
+  if( !objectCtx[eventName+'Handlers'] )  objectCtx[eventName+'Handlers'] = [];
+
+  var handlers  = objectCtx[eventName+'Handlers'];
+  for(var i = 0; i < handlers.length; i++){
+    var handler = handlers[i];
+    if( callback != handler.callback )  continue;
+    if( useCapture != handler.useCapture )  continue;
+    handlers.splice(i, 1)
+    break;
+  }
+  // from this object from this._boundObjs
+  var index = this._boundObjs.indexOf(object3d);
+  console.assert( index !== -1 );
+  this._boundObjs.splice(index, 1);
+}
+
+THREEx.DomEvent.prototype._bound  = function(eventName, object3d)
+{
+  var objectCtx = this._objectCtxGet(object3d);
+  if( !objectCtx )  return false;
+  return objectCtx[eventName+'Handlers'] ? true : false;
+}
+
+/********************************************************************************/
+/*    onMove                */
+/********************************************************************************/
+
+// # handle mousemove kind of events
+
+THREEx.DomEvent.prototype._onMove = function(mouseX, mouseY, origDomEvent)
+{
+  var vector  = new THREE.Vector3( mouseX, mouseY, 1 );
+  this._projector.unprojectVector( vector, this._camera );
+
+  var ray   = new THREE.Ray( this._camera.position, vector.subSelf( this._camera.position ).normalize() );
+  var intersects = ray.intersectObjects( this._boundObjs );
+  
+  var oldSelected = this._selected;
+
+  if( intersects.length > 0 ){
+    var intersect = intersects[ 0 ];
+    var newSelected = intersect.object;
+    this._selected  = newSelected;
+  
+    var notifyOver, notifyOut;
+    if( oldSelected != newSelected ){
+      // if newSelected bound mouseenter, notify it
+      notifyOver  = this._bound('mouseover', newSelected);
+      // if there is a oldSelect and oldSelected bound mouseleave, notify it
+      notifyOut = oldSelected && this._bound('mouseout', oldSelected);
+    }
+  }else{
+    // if there is a oldSelect and oldSelected bound mouseleave, notify it
+    notifyOut = oldSelected && this._bound('mouseout', oldSelected);
+    this._selected  = null;
+  }
+
+  // notify mouseEnter - done at the end with a copy of the list to allow callback to remove handlers
+  notifyOver && this._notify('mouseover', newSelected, origDomEvent);
+  // notify mouseLeave - done at the end with a copy of the list to allow callback to remove handlers
+  notifyOut  && this._notify('mouseout', oldSelected, origDomEvent);
+}
+
+
+/********************************************************************************/
+/*    onEvent               */
+/********************************************************************************/
+
+// # handle click kind of events
+
+THREEx.DomEvent.prototype._onEvent  = function(eventName, mouseX, mouseY, origDomEvent)
+{
+  var vector  = new THREE.Vector3( mouseX, mouseY, 1 );
+  this._projector.unprojectVector( vector, this._camera );
+
+  vector.subSelf( this._camera.position ).normalize()
+  var ray   = new THREE.Ray( this._camera.position, vector );
+  var intersects  = ray.intersectObjects( this._boundObjs );
+
+  // if there are no intersections, return now
+  if( intersects.length === 0 ) return;
+
+  // init some vairables
+  var intersect = intersects[0];
+  var object3d  = intersect.object;
+  var objectCtx = this._objectCtxGet(object3d);
+  if( !objectCtx )  return;
+
+  // notify handlers
+  this._notify(eventName, object3d, origDomEvent);
+}
+
+THREEx.DomEvent.prototype._notify = function(eventName, object3d, origDomEvent)
+{
+  var objectCtx = this._objectCtxGet(object3d);
+  var handlers  = objectCtx ? objectCtx[eventName+'Handlers'] : null;
+
+  // do bubbling
+  if( !objectCtx || !handlers || handlers.length === 0 ){
+    object3d.parent && this._notify(eventName, object3d.parent);
+    return;
+  }
+  
+  // notify all handlers
+  var handlers  = objectCtx[eventName+'Handlers'];
+  for(var i = 0; i < handlers.length; i++){
+    var handler = handlers[i];
+    var toPropagate = true;
+    handler.callback({
+      type    : eventName,
+      target    : object3d,
+      origDomEvent  : origDomEvent,
+      stopPropagation : function(){
+        toPropagate = false;
+      }
+    });
+    if( !toPropagate )  continue;
+    // do bubbling
+    if( handler.useCapture === false ){
+      object3d.parent && this._notify(eventName, object3d.parent);
+    }
+  }
+}
+
+/********************************************************************************/
+/*    handle mouse events           */
+/********************************************************************************/
+// # handle mouse events
+
+THREEx.DomEvent.prototype._onMouseDown  = function(event){ return this._onMouseEvent('mousedown', event); }
+THREEx.DomEvent.prototype._onMouseUp  = function(event){ return this._onMouseEvent('mouseup'  , event); }
+
+
+THREEx.DomEvent.prototype._onMouseEvent = function(eventName, domEvent)
+{
+  var mouseX  = +(domEvent.clientX / window.innerWidth ) * 2 - 1;
+  var mouseY  = -(domEvent.clientY / window.innerHeight) * 2 + 1;
+  return this._onEvent(eventName, mouseX, mouseY, domEvent);
+}
+
+THREEx.DomEvent.prototype._onMouseMove  = function(domEvent)
+{
+  var mouseX  = +(domEvent.clientX / window.innerWidth ) * 2 - 1;
+  var mouseY  = -(domEvent.clientY / window.innerHeight) * 2 + 1;
+  return this._onMove(mouseX, mouseY, domEvent);
+}
+
+THREEx.DomEvent.prototype._onClick    = function(event)
+{
+  // TODO handle touch ?
+  return this._onMouseEvent('click' , event);
+}
+THREEx.DomEvent.prototype._onDblClick   = function(event)
+{
+  // TODO handle touch ?
+  return this._onMouseEvent('dblclick'  , event);
+}
+
+/********************************************************************************/
+/*    handle touch events           */
+/********************************************************************************/
+// # handle touch events
+
+
+THREEx.DomEvent.prototype._onTouchStart = function(event){ return this._onTouchEvent('mousedown', event); }
+THREEx.DomEvent.prototype._onTouchEnd = function(event){ return this._onTouchEvent('mouseup'  , event); }
+
+THREEx.DomEvent.prototype._onTouchMove  = function(domEvent)
+{
+  if( domEvent.touches.length != 1 )  return undefined;
+
+  domEvent.preventDefault();
+
+  var mouseX  = +(domEvent.touches[ 0 ].pageX / window.innerWidth ) * 2 - 1;
+  var mouseY  = -(domEvent.touches[ 0 ].pageY / window.innerHeight) * 2 + 1;
+  return this._onMove('mousemove', mouseX, mouseY, domEvent);
+}
+
+THREEx.DomEvent.prototype._onTouchEvent = function(eventName, domEvent)
+{
+  if( domEvent.touches.length != 1 )  return undefined;
+
+  domEvent.preventDefault();
+
+  var mouseX  = +(domEvent.touches[ 0 ].pageX / window.innerWidth ) * 2 - 1;
+  var mouseY  = -(domEvent.touches[ 0 ].pageY / window.innerHeight) * 2 + 1;
+  return this._onEvent(eventName, mouseX, mouseY, domEvent);  
+}
+
+module.exports = THREEx.DomEvent;
+},{}],21:[function(require,module,exports){
 // This THREEx helper makes it easy to handle the fullscreen API
 // * it hides the prefix for each browser
 // * it hides the little discrepencies of the various vendor API
@@ -1743,7 +2321,7 @@ THREEx.FullScreen.bindKey	= function(opts){
 }
 
 module.exports = THREEx.FullScreen;
-},{}],19:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 // THREEx.KeyboardState.js keep the current state of the keyboard.
 // It is possible to query it at any time. No need of an event.
 // This is particularly convenient in loop driven case, like in
@@ -1863,7 +2441,7 @@ THREEx.KeyboardState.prototype.pressed	= function(keyDesc)
 
 module.exports = THREEx.KeyboardState;
 
-},{}],20:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 // This THREEx helper makes it even easier to use spark.js with three.js
 // * FIXME This is currently only with WebGL
 
@@ -2091,7 +2669,7 @@ THREEx.Sparks.prototype._buildDefaultTexture	= function(size)
 
 module.exports = THREEx.Sparks;
 
-},{"../Sparks.js":16}],21:[function(require,module,exports){
+},{"../Sparks.js":18}],24:[function(require,module,exports){
 // This THREEx helper makes it easy to handle window resize.
 // It will update renderer and camera when window is resized.
 //
@@ -2140,7 +2718,7 @@ THREEx.WindowResize	= function(renderer, camera){
 
 module.exports = THREEx.WindowResize;
 
-},{}],22:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 THREE.Sound3D=function(a,b,c,d){
 	THREE.Object3D.call(this);
 	this.isLoaded=!1;
@@ -2228,4 +2806,4 @@ THREE.Sound3D.prototype.update=function(a,b,c){
 	for(a=0;a<d;a++)
 		this.children[a].update(this.globalMatrix,b,c)
 };
-},{}]},{},[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]);
+},{}]},{},[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25]);

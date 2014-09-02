@@ -7,5 +7,7 @@ module.exports = {
 	Sparks : require('./THREEx/Sparks.js'),
 
 	FullScreen : require('./THREEx/FullScreen.js'),
+
+	Domevent : require('./THREEx/Domevent.js')
 	
 };

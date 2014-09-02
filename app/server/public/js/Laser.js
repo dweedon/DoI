@@ -33,7 +33,6 @@ function Laser(position, rotation, velocity) {
 Laser.prototype = new THREE.Object3D();
 Laser.prototype.constructor = Laser;
 
-
 Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({ 
 	map: THREE.ImageUtils.loadTexture( "assets/particle.png" ), 
 	transparent: true,
@@ -42,21 +41,16 @@ Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({
 	fog: true 
 });
 
+Laser.prototype.isDead = false;
+
 Laser.prototype.stats = {
 	speed : 40,
 	range : 1,
 	accuracy : 5,
 	dmg : 10
 };
+
 Laser.prototype.timeTraveled = 0;
 
-
-
-
-
-Laser.prototype.destroy = function() {
-
-	this.sprite.visible = false;
-};
 
 module.exports = Laser;

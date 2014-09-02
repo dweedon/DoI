@@ -6,6 +6,7 @@ function players(scene) {
   var self = this;
 
   this.players = {};
+  this.allPlayerShips = [];
 
   this.scene = scene;
 
@@ -23,6 +24,7 @@ function players(scene) {
   function addPlayer(id, name) {
     self.players[id] = new player(id, name);
     self.scene.add(self.players[id].ship);
+    self.allPlayerShips.push(self.players[id].ship);
     return self.players[id];
   }
 }

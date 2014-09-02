@@ -47,6 +47,8 @@ var init = function() {
 	THREEx.WindowResize(renderer, camera); // Resize game to fit window
 	THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) }); // bind fullscreen mode to 'm' key
 
+
+
 	user = players.addPlayer(1, 'David');
 	players.addPlayer(2, 'NPC');
 	user.camera = camera;
@@ -57,12 +59,24 @@ var init = function() {
 
 var play = function() {
 
-	
-
 	var delta = clock.getDelta();
 	background.update(user.ship.position);
 	camera.update(user.ship.position);
 	lasers.update(delta);
+
+	for ( var id in players.players ) {
+		if ( id == user.id ) continue;
+		players.players[id].update({
+			delta: delta,
+			input: {
+				up: false,
+				left: true,
+				space: false,
+				right: false,
+				tab : false
+			}
+		});
+	}
 	user.update({
 		delta : delta,
 		input : input()
@@ -74,4 +88,7 @@ var play = function() {
 
 
 init();
+
+
+
 

@@ -16,19 +16,26 @@ function lasers (scene) {
 		while(i > 0) {
 			i--;
 			var laser = this.lasers[i];
+
 			if ( laser.timeTraveled < laser.stats.range ) {
-				// TODO: handle overshooting
-				laser.position.x += delta * laser.velocity.x;
-				laser.position.y += delta * laser.velocity.y;
-				laser.timeTraveled += delta * 1;
-				
-				for ( var id in players.players ) {
-					var ship = players.players[id].ship;
-					var d = laser.position.distanceTo(ship.position);
-				    if (  d < 3 ) 
-				    {
-				    	laser.destroy();
-				    }
+
+				if (!laser.isDead) {
+
+					laser.position.x += delta * laser.velocity.x;
+					laser.position.y += delta * laser.velocity.y;
+					laser.timeTraveled += delta * 1;
+					
+					// Test for Collision with players
+					for ( var id in players.players ) {
+						var ship = players.players[id].ship;
+						var d = laser.position.distanceTo(ship.position);
+					    if ( d < ship.stats.hitBoxRadius ) 
+					    {
+					    	ship.takeDmg(laser.stats.dmg);
+					    	laser.visible = false;
+					    	laser.isDead = true;
+					    }
+					}
 				}
 			}
 			else {

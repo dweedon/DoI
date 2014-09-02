@@ -10,6 +10,8 @@ player.prototype = {
 
   ship : new ship(),
 
+  isUsersTarget : false,
+
   input : {
     up    : false,
     down  : false,
@@ -23,6 +25,34 @@ player.prototype = {
       this.right = false;
       this.space = false;
     }
+  },
+
+  target : null,
+
+  selectTarget : function() {
+    
+    var self = this;
+    var target;
+    if ( this.target === null ) {
+      for ( var ids in players.players ) {
+        target = players.lookup(ids);
+        if ( target !== self ) return target;
+      }
+    } else {
+      target = players.lookup(this.target.id + 1);
+      if ( typeof target !== undefined && target !== this )
+        return target;
+      else 
+        target = players.lookup(0);
+
+      if (target !== user) 
+          return target;
+      else 
+        return players.lookup(1);
+    }
+    this.target = players.lookup(2);
+    this.target.isUsersTarget = true;
+
   },
 
   accelerate : function (delta) {
@@ -61,12 +91,28 @@ player.prototype = {
     }
   },
 
-  updateInput : function() {
-
-  },
-
   update: function(update) {
 
+      if (this.isUsersTarget) {
+        this.ship.healthbar.visible = true;
+      } else {
+        this.ship.healthbar.visible = false;
+      }
+
+      var self = this;
+      if(this.ship.isExploding) {
+        this.ship.explosion.update(update.delta);
+        if( this.ship.explosion.currentTile == 13 ) {
+          this.ship.shipModel.visible = false;
+          setTimeout( function() {
+            players.deletePlayer(self.id);
+          }, 500);
+        }
+      }
+
+      if (update.input.tab) {
+        this.target = this.selectTarget();
+      }
       if (update.input.up) {
         this.accelerate(update.delta);
         //this.ship.thrust.on();
