@@ -1,147 +1,168 @@
 var ship = require('./ship.js');
 
 function player(id, name) {
-  	this.id = id;
-  	this.name = name;
-  	this.ship = new ship();
+	this.id = id;
+	this.name = name;
+  this.kills = 0;
+  this.deaths = 0;
+  this.ship = new ship();
+  this.inputs = [];
 }
 
 player.prototype = {
 
   ship : new ship(),
 
-  isUsersTarget : false,
-
-  input : {
-    up    : false,
-    down  : false,
-    left  : false,
-    right : false,
-    space : false,
-    reset : function () {
-      this.up = false;
-      this.down = false;
-      this.left = false;
-      this.right = false;
-      this.space = false;
-    }
-  },
+  serverUpdate : false,
 
   target : null,
 
-  selectTarget : function() {
-    
-    var self = this;
+  setTarget : function(target) {
+
+    // If a target is already selected untarget it
+    if (this.target !== null) this.target.ship.toggleTargeted();
+
+    // Set the new target
+    this.target = target;
+    this.target.ship.toggleTargeted();
+
+  },
+
+  unsetTarget : function() {
+    this.target.ship.toggleTargeted();
+    this.target = null;
+  },
+
+  nextTarget : function() {
+
     var target;
+    
+    // If no target is selected, target the next player after this player (the user)
     if ( this.target === null ) {
-      for ( var ids in players.players ) {
-        target = players.lookup(ids);
-        if ( target !== self ) return target;
+
+      target = players.nextPlayer(this);
+
+      // If the next player was also this player, then select no target
+      if (target === this) return; 
+    }
+
+    // If a target is selected, target the next player after the current target
+    else {
+      target = players.nextPlayer(this.target); 
+
+      // If the next player was also this player, then select no new target and deselect the current target
+      if (target === this) {
+        this.unsetTarget();
+        return;
       }
-    } else {
-      target = players.lookup(this.target.id + 1);
-      if ( typeof target !== undefined && target !== this )
-        return target;
-      else 
-        target = players.lookup(0);
-
-      if (target !== user) 
-          return target;
-      else 
-        return players.lookup(1);
     }
-    this.target = players.lookup(2);
-    this.target.isUsersTarget = true;
+
+    // Set the target if everything above gets through
+    this.setTarget(target);
 
   },
 
-  accelerate : function (delta) {
-    this.ship.velocity.x -= delta * this.ship.stats.accelRate *  Math.sin(this.ship.rotation.z); // Adjust X Velocity
-    this.ship.velocity.y += delta * this.ship.stats.accelRate *  Math.cos(this.ship.rotation.z); // Adjust Y Velocity
-    if ( this.ship.velocity.lengthSq() > Math.pow(this.ship.stats.maxSpeed, 2) ) // If the new velocity is too fast
-      this.ship.velocity.setLength(this.ship.stats.maxSpeed); // Bring it back to max speed
-  },
+  handleServerUpdate: function() {
 
-  turnLeft : function (delta) {
-    this.ship.rotateOnAxis( new THREE.Vector3(0,0,1), delta * Math.PI/180 * this.ship.stats.turnRate); // Rotate Left
-    if(this.ship.shipModel.rotation.z < this.ship.stats.maxBankAngle) { // If below max bank angle
-      this.ship.shipModel.rotation.z += this.ship.stats.maxBankAngle * 0.05; // Bank the ship a little
-      //this.ship.thrust.container.rotation.y -= this.ship.stats.maxBankAngle * 0.05; // Bank the thrust too
-    }
-  },
+    // Accept Server Position Information
+    this.ship.position.x = this.serverUpdate.ship.position.x;
+    this.ship.position.y = this.serverUpdate.ship.position.y;
+    this.ship.rotation.z = this.serverUpdate.ship.rotation;
+    this.ship.velocity.x = this.serverUpdate.ship.velocity.x;
+    this.ship.velocity.y = this.serverUpdate.ship.velocity.y;
+    this.ship.health = this.serverUpdate.ship.health;
+    this.ship.energy = this.serverUpdate.ship.energy;
 
-  turnRight: function (delta) {
-    this.ship.rotateOnAxis( new THREE.Vector3(0,0,-1), delta * Math.PI/180 * this.ship.stats.turnRate); // Rotate Right
-    if(this.ship.shipModel.rotation.z > -this.ship.stats.maxBankAngle) { // If below max bank angle
-      this.ship.shipModel.rotation.z -= this.ship.stats.maxBankAngle * 0.05; // Bank the ship a little
-      //this.ship.thrust.container.rotation.y += this.ship.stats.maxBankAngle * 0.05; // Bank the thrust too
-    }
-  },
+    if ( this.serverUpdate.ship.isExploding ) this.ship.explode();
 
-  canFire : true,
+    if (this.inputs.length > 0) {
+    
+      var lastSeqIndex = -1;
 
-  fireLaser : function (delta) {
-    var self = this;
-    if ( self.canFire ) {
-      lasers.newLaser(this.ship.position, this.ship.rotation.z, this.ship.velocity);
-      this.canFire = false;
-      setTimeout(function() {
-        self.canFire = true;
-      }, 100);
-    }
-  },
-
-  update: function(update) {
-
-      if (this.isUsersTarget) {
-        this.ship.healthbar.visible = true;
-      } else {
-        this.ship.healthbar.visible = false;
-      }
-
-      var self = this;
-      if(this.ship.isExploding) {
-        this.ship.explosion.update(update.delta);
-        if( this.ship.explosion.currentTile == 13 ) {
-          this.ship.shipModel.visible = false;
-          setTimeout( function() {
-            players.deletePlayer(self.id);
-          }, 500);
+      // Find and store the input index that the update from the server is associated with
+      for(var i = 0, l = this.inputs.length; i < l; ++i) {
+        if ( this.inputs[i].seq == this.serverUpdate.seq ) {
+          lastSeqIndex = i;
+          break;
         }
       }
 
-      if (update.input.tab) {
-        this.target = this.selectTarget();
-      }
-      if (update.input.up) {
-        this.accelerate(update.delta);
-        //this.ship.thrust.on();
-      } else {
-        //this.ship.thrust.off();
-      }
-      if (update.input.left) {
-        this.turnLeft(update.delta);
-      }
-      if (update.input.right) {
-        this.turnRight(update.delta);
-      }
-      if (!update.input.left && !update.input.right ) {
-        if (this.ship.shipModel.rotation.z > 0) {
-          this.ship.shipModel.rotation.z -= this.ship.stats.maxBankAngle * 0.05;
-          //this.ship.thrust.container.rotation.y += this.ship.stats.maxBankAngle * 0.05;
-        }
-        if (this.ship.shipModel.rotation.z < 0) {
-          this.ship.shipModel.rotation.z += this.ship.stats.maxBankAngle * 0.05;
-          //this.ship.thrust.container.rotation.y -= this.ship.stats.maxBankAngle * 0.05;
-        }
-      } 
-      if (update.input.space) {
-        this.fireLaser();
+      // Assuming we found a matching input seq from the server, dump everything before it
+      if(lastSeqIndex != -1) {
+        var numberToClear = Math.abs(lastSeqIndex + 1);
+        this.inputs.splice(0, numberToClear);
       }
 
-    this.ship.position.x += update.delta * this.ship.velocity.x;
-    this.ship.position.y += update.delta * this.ship.velocity.y;
+      // For each remaining input reprocess positioning except last
+      for(i = 0, l = this.inputs.length - 1; i<l; i++) {
+        
+        var input = this.inputs[i].input;
+        var delta = this.inputs[i].delta;
+        if (input.up) this.ship.accelerate(delta);
+        if (input.left) this.ship.turnLeft(delta);
+        if (input.right) this.ship.turnRight(delta);
+        this.ship.move(delta);
 
+      }
+
+      this.handleInput(this.inputs[this.inputs.length - 1]);
+
+    }
+
+    // Clear server update
+    this.serverUpdate = false;
+
+
+  },
+
+  handleInput : function(input) {
+    if (input.input.up) this.ship.accelerate(input.delta);
+    if (input.input.left) this.ship.turnLeft(input.delta);
+    if (input.input.right) this.ship.turnRight(input.delta);
+    if (!input.input.left && !input.input.right ) this.ship.resetBankAngle(input.delta);
+    if (input.input.tab) this.nextTarget();
+    if (input.input.space) this.ship.fireLaser(this);
+  },
+
+  update: function(delta) {
+
+    // If the player's ship is flagged as dead do nothing
+    if (this.ship.isDead) return;
+
+      if (this.ship.health <= 0 &&  !this.ship.isExploding ) {
+        this.ship.explode();
+      }
+
+      // If the player's ship has a target, and the target's ship is dead, reset this players target to null
+      if (this.target && this.target.ship.isDead) this.target = null;
+
+      // Check for an update from the server, and recalculate position based on server position or just do local positioning
+      if (this.serverUpdate) this.handleServerUpdate();
+      else if (this.inputs.length > 0) this.handleInput(this.inputs[this.inputs.length - 1]);
+
+      // Regen the ship's hp and energy
+      this.ship.regen(delta);
+
+      // Move the ship
+      this.ship.move(delta);
+
+      // Handle Explosion
+      if (this.ship.isExploding) {
+
+        // Progress Explosion Frames
+        this.ship.explosion.update(delta);
+        
+        // Hide this player's ship when the explosion gets to frame 13 (largest part of animation)
+        if( this.ship.explosion.currentTile == 13 ) this.ship.shipModel.visible = false;
+
+        // Remove this player's ship when explosion is over and increase this players death count
+        if ( this.ship.explosion.isOver ) { 
+          players.removeShip(this.ship);
+          this.ship.isDead = true;
+          this.deaths++;
+        }
+
+      }
   }
 
 };

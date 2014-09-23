@@ -1,57 +1,45 @@
 var Laser = require('./Laser.js');
-function lasers (scene) {
 
-	this.scene = scene;
+function lasers () {
+  	THREE.Object3D.call(this);
+}
 
-	this.lasers = [];
+lasers.prototype = new THREE.Object3D();
+lasers.prototype.constructor = lasers;
 
-	this.update = update;
-
-	this.newLaser = newLaser;
-
-	function update(delta) {
-
-		var self = this;
-		var i = this.lasers.length;
-		while(i > 0) {
-			i--;
-			var laser = this.lasers[i];
-
-			if ( laser.timeTraveled < laser.stats.range ) {
-
-				if (!laser.isDead) {
-
-					laser.position.x += delta * laser.velocity.x;
-					laser.position.y += delta * laser.velocity.y;
-					laser.timeTraveled += delta * 1;
-					
-					// Test for Collision with players
-					for ( var id in players.players ) {
-						var ship = players.players[id].ship;
-						var d = laser.position.distanceTo(ship.position);
-					    if ( d < ship.stats.hitBoxRadius ) 
-					    {
-					    	ship.takeDmg(laser.stats.dmg);
-					    	laser.visible = false;
-					    	laser.isDead = true;
-					    }
-					}
+lasers.prototype.update = function(delta) {
+	var i = this.children.length;
+	while(i > 0) {
+		i--;
+		var laser = this.children[i];
+		if ( laser.timeTraveled < laser.stats.range ) { // if laser has not hit max range
+			if (!laser.isDead) { // If laser is not dead (scheduled for removal)
+				laser.move(delta); // Move the laser
+				if (laser.testCollision()) {
+					this.remove(laser);
+					// TODO: Not garunteed to remove the right element as we add more sounds
+					$( "audio" ).first().remove();
 				}
 			}
-			else {
-				scene.remove(laser);
-				this.lasers.splice(i,1);
-				// TODO: Not garunteed to remove the right element as we add more sounds
-				$( "audio" ).first().remove();
-			}
+		} else {
+			this.remove(laser);
+			// TODO: Not garunteed to remove the right element as we add more sounds
+			$( "audio" ).first().remove();
 		}
 	}
+};
 
-	function newLaser (position, rotation, velocity) {
-		
-		this.lasers.push(new Laser(position, rotation, velocity));
-		scene.add(this.lasers[this.lasers.length - 1]);
+lasers.prototype.newLaser = function (position, rotation, velocity, owner, timeTraveled) {
+	var laser = new Laser(position, rotation, velocity, owner, timeTraveled);
+	this.add(laser);
+};
 
-	}
-}
+lasers.prototype.newLaserFromServer = function(data) {
+	console.log('laser added');
+	var laser = new Laser(data.owner.ship.position, data.owner.ship.rotation.z, data.owner.ship.velocity, data.owner);
+	this.add(laser);
+};
+
+
+
 module.exports = lasers;

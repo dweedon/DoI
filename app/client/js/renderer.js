@@ -1,4 +1,3 @@
-
 var Detector = require('./vendor/Detector.js');
 
 if ( Detector.webgl ) 

@@ -1,13 +1,12 @@
-
-var endSound = new THREE.Sound3D("assets/hit.wav", 220, 1.5, false);
-
-
-
-function Laser(position, rotation, velocity) {
+function Laser(position, rotation, velocity, owner, timeTraveled) {
 
 	THREE.Object3D.call(this);
   	this.sprite = new THREE.Sprite(this.spriteMaterial);
   	this.add(this.sprite);
+
+  	this.owner = owner;
+
+  	this.timeTraveled = timeTraveled || 0;
 
   	// Copy ship rotation and then randomize slightly based on set accuracy
   	this.rotation.z = rotation;
@@ -33,6 +32,13 @@ function Laser(position, rotation, velocity) {
 Laser.prototype = new THREE.Object3D();
 Laser.prototype.constructor = Laser;
 
+Laser.prototype.stats = {
+	speed : 40,
+	range : 1,
+	accuracy : 0,
+	dmg : 10
+};
+
 Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({ 
 	map: THREE.ImageUtils.loadTexture( "assets/particle.png" ), 
 	transparent: true,
@@ -41,16 +47,20 @@ Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({
 	fog: true 
 });
 
-Laser.prototype.isDead = false;
-
-Laser.prototype.stats = {
-	speed : 40,
-	range : 1,
-	accuracy : 5,
-	dmg : 10
+Laser.prototype.move = function(delta) {
+	this.position.x += delta * this.velocity.x;
+	this.position.y += delta * this.velocity.y;
+	this.timeTraveled += delta * 1;
 };
 
-Laser.prototype.timeTraveled = 0;
-
+Laser.prototype.testCollision = function() {
+	for ( var i = 0, l = players.ships.children.length; i < l; i++ ) {
+		var ship = players.ships.children[i];
+		var d = this.position.distanceTo(ship.position);
+		if ( d < ship.stats.hitBoxRadius ) {
+			return true;
+		}
+	}
+};
 
 module.exports = Laser;

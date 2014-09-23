@@ -1,14 +1,13 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-
-var endSound = new THREE.Sound3D("assets/hit.wav", 220, 1.5, false);
-
-
-
-function Laser(position, rotation, velocity) {
+function Laser(position, rotation, velocity, owner, timeTraveled) {
 
 	THREE.Object3D.call(this);
   	this.sprite = new THREE.Sprite(this.spriteMaterial);
   	this.add(this.sprite);
+
+  	this.owner = owner;
+
+  	this.timeTraveled = timeTraveled || 0;
 
   	// Copy ship rotation and then randomize slightly based on set accuracy
   	this.rotation.z = rotation;
@@ -34,6 +33,13 @@ function Laser(position, rotation, velocity) {
 Laser.prototype = new THREE.Object3D();
 Laser.prototype.constructor = Laser;
 
+Laser.prototype.stats = {
+	speed : 40,
+	range : 1,
+	accuracy : 0,
+	dmg : 10
+};
+
 Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({ 
 	map: THREE.ImageUtils.loadTexture( "assets/particle.png" ), 
 	transparent: true,
@@ -42,17 +48,21 @@ Laser.prototype.spriteMaterial = new THREE.SpriteMaterial({
 	fog: true 
 });
 
-Laser.prototype.isDead = false;
-
-Laser.prototype.stats = {
-	speed : 40,
-	range : 1,
-	accuracy : 5,
-	dmg : 10
+Laser.prototype.move = function(delta) {
+	this.position.x += delta * this.velocity.x;
+	this.position.y += delta * this.velocity.y;
+	this.timeTraveled += delta * 1;
 };
 
-Laser.prototype.timeTraveled = 0;
-
+Laser.prototype.testCollision = function() {
+	for ( var i = 0, l = players.ships.children.length; i < l; i++ ) {
+		var ship = players.ships.children[i];
+		var d = this.position.distanceTo(ship.position);
+		if ( d < ship.stats.hitBoxRadius ) {
+			return true;
+		}
+	}
+};
 
 module.exports = Laser;
 
@@ -60,15 +70,15 @@ module.exports = Laser;
 // background stars setup
 
 
-var starCount = 1000;
+var starCount = 250;
 
 var geometry = new THREE.Geometry();
 
 for ( i = 0; i < starCount; i ++ ) {
 
 	var vertex = new THREE.Vector3();
-	vertex.x = Math.random() * 600 - 300;
-	vertex.y = Math.random() * 600 - 300;
+	vertex.x = Math.random() * 300 - 150;
+	vertex.y = Math.random() * 300 - 150;
 	vertex.z = Math.random() * 100 - 100;
 	geometry.vertices.push( vertex );
 
@@ -87,25 +97,31 @@ var material = new THREE.PointCloudMaterial({
 });
 
 stars = new THREE.PointCloud( geometry, material );
-stars.sortParticles = true;
+
+
 
 stars.update = function (target) {
+
+	// TODO: This is dumb but needed to fix a bug, bounding box does not seem to update, should be a cleaner way to fix...
+	if (stars.geometry.boundingSphere !== null && stars.geometry.boundingSphere.radius !== 100000)  {
+		stars.geometry.boundingSphere.radius = 100000;
+	}
 
 	for (var i = 0, l = stars.geometry.vertices.length; i < l; i++) {
 
 		var star = stars.geometry.vertices[i];
 		
 		star.y = 
-			target.y - star.y >  300 ? target.y + 300:
-			target.y - star.y < -300 ? target.y - 300:
+			target.y - star.y >  150 ? target.y + 150:
+			target.y - star.y < -150 ? target.y - 150:
 			star.y;
+
 		star.x = 
-			target.x - star.x >  300 ? target.x + 300:
-			target.x - star.x < -300 ? target.x - 300:
+			target.x - star.x >  150 ? target.x + 150:
+			target.x - star.x < -150 ? target.x - 150:
 			star.x;
 		
 	}
-
 	stars.geometry.verticesNeedUpdate = true;
 
 };
@@ -174,6 +190,8 @@ Explosion.prototype.constructor = Explosion;
 
 Explosion.prototype.currentDisplayTime = 0;
 Explosion.prototype.currentTile = 0;
+Explosion.prototype.numberOfTiles = 24;
+Explosion.prototype.isOver = false;
 Explosion.prototype.tileDisplayDuration = 50;
 
 Explosion.prototype.update = function(delta) {
@@ -182,11 +200,10 @@ Explosion.prototype.update = function(delta) {
 	if (this.currentTile == 5) this.startSound.play();
 	while (this.currentDisplayTime > this.tileDisplayDuration)
 	{
+		if (this.currentTile === this.numberOfTiles) this.isOver = true;
 		this.visible = true;
 		this.currentDisplayTime -= this.tileDisplayDuration;
 		this.currentTile++;
-		if (this.currentTile == this.numberOfTiles)
-			this.currentTile = 0;
 		var currentColumn = this.currentTile % 5;
 		this.texture.offset.x = currentColumn / 5;
 
@@ -201,67 +218,39 @@ function Healthbar() {
 
 	THREE.Sprite.call(this);
 
-  	this.setHealth = setHealth;
-
-  	this.color = new THREE.Color( "rgb(0,255,0)" );
-
   	this.map = THREE.ImageUtils.loadTexture( "assets/healthbar.png" );
   	this.material = new THREE.SpriteMaterial({ 
 		map: this.map,
-		color: this.color
+		color:  new THREE.Color( "rgb(0,255,0)" )
 	});
 
-	this.position.z = 2;
-	this.position.y = 0;
-
+	this.visible = false;
 	this.scale.x = 7.5;
 	this.scale.y = 7.5;
 
-
-
-  	function setHealth(health) {
-  		var h = health * 7.5;
-  		this.scale.x = h;
-  		this.material = new THREE.SpriteMaterial({ 
-			map: this.map,
-			color:  this.color.lerp( new THREE.Color( "rgb(255,0,0)" ), 1/h )
-		});
-  	}
-
-
 }
 
-Healthbar.prototype = new THREE.Sprite( 
-	new THREE.SpriteMaterial({ 
-		map: THREE.ImageUtils.loadTexture( "assets/healthbarborder.png" ),
-		blending : THREE.AdditiveBlending
-	})
-);
+Healthbar.prototype = new THREE.Sprite();
 
 Healthbar.prototype.constructor = Healthbar;
 
+Healthbar.prototype.position.z = 2;
+
+Healthbar.prototype.setHealth = function(h) {
+	this.scale.x = h * 7.5;
+	if ( h > 0.7 ) {
+		this.material.color.g = 1;
+		this.material.color.r = (1 - h) * (1/0.3);
+	} else {
+		this.material.color.g = h * (1/0.7);
+		this.material.color.r = 1;
+	} 
+};
+
 module.exports = Healthbar;
 },{}],6:[function(require,module,exports){
-
-var THREEx = require('./vendor/THREEx.js');
-var input = require('./input.js');
-
-var camera  		= require('./camera.js'),
-	lighting 		= require('./lighting.js'),
-	background		= require('./background.js'),
-	renderer 		= require('./renderer.js'),
-	clock 			= new THREE.Clock(),
-	scene 			= new THREE.Scene(),
-	Players			= require('./players.js');
-	players 		= new Players(scene);
-	Lasers			= require('./lasers');
-	lasers 			= new Lasers(scene);
-	soundRenderer 	= new THREE.SoundRenderer();
-
-var user;
-
 // Connection Stuff
-var socket = io.connect('http://localhost');
+var socket = io.connect();
 
 $("#login button").click( function(e) {
 	e.preventDefault();
@@ -277,142 +266,244 @@ socket.on('success', function(success) {
 });
 
 
-var init, play;
 
+// Game Stuff
 
-var init = function() {
+var renderer 		= require('./renderer.js'),
+	camera  		= require('./camera.js'),
+	lighting 		= require('./lighting.js'),
+	background		= require('./background.js'),
+	PlayerStats 	= require('./playerStats.js'),
+	Lasers			= require('./lasers'),
+	THREEx 			= require('./vendor/THREEx.js'),
+	input 			= require('./input.js'),
+	playerStats 	= new PlayerStats(),
+	clock 			= new THREE.Clock(),
+	scene 			= new THREE.Scene(),
+	soundRenderer 	= new THREE.SoundRenderer();
 
+	// Globals TODO: BAD FIX PLZ
+	mm = require('./mm.js');
+	players = require('./players.js');
+	lasers 	= new Lasers();
+
+var user;
+
+socket.on('init', function(init) {
+	setup(init);
+});
+
+socket.on('newPlayer', function(player) {
+	players.addPlayer(player.id, player.name);
+});
+
+socket.on('removePlayer', function(player) {
+	players.removePlayer(player);
+});
+
+socket.on('update', function(update) {
+
+	// Handle Player Update
+	for ( var i = 0, l = update.players.length; i<l; i++ ) {
+		var player = players.lookup(update.players[i].id);
+		player.serverUpdate = update.players[i];
+	}
+
+	
+	
+	for ( i = 0, l = update.lasers.length; i<l; i++ ) {
+		var owner = players.lookup(update.lasers[i].owner);
+		console.log(update.lasers[i].owner);
+		if (owner === user) continue;
+		
+		update.lasers[i].owner = owner;
+		lasers.newLaserFromServer(update.lasers[i]);
+	}
+	
+
+});
+
+function setup(init) {
+
+	// Turn off default input TODO: Make this more selective
+	$(document).keydown(function(event){ event.preventDefault(); });
+
+	// Setup scene
 	scene.add(camera);
-	scene.add(lighting);
 	scene.add(background);
+	scene.add(players.ships);
+	scene.add(lighting);
+	scene.add(lasers);
 
+	mm.scene.add(mm.camera);
+	mm.scene.add(mm.blips);
+
+	// Add renderers to DOM
 	$('#game').append( soundRenderer.domElement );
-	$('#game').append( renderer.domElement );  // Add renderer to DOM
-	THREEx.WindowResize(renderer, camera); // Resize game to fit window
-	THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) }); // bind fullscreen mode to 'm' key
+	$('#game').append( renderer.domElement );
+	$('#game').append( mm.renderer.domElement );
 
+	// Handle window resizing
+	THREEx.WindowResize(renderer, camera); 
 
+	// Bind fullscreen mode to 'm' key
+	THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) }); 
 
-	user = players.addPlayer(1, 'David');
-	players.addPlayer(2, 'NPC');
-	user.camera = camera;
+	// Spawn players
+	for ( var i = 0, l = init.players.length; i<l; i++ ) {
+		players.addPlayer(init.players[i].id, init.players[i].name);
+	}
+
+	// Set User
+	user = players.lookup(init.id);
 
 	play();
 
-};
+}
 
-var play = function() {
+function play() {
 
+	// Get time delta
 	var delta = clock.getDelta();
-	background.update(user.ship.position);
-	camera.update(user.ship.position);
+
+	// Update the lasers
 	lasers.update(delta);
 
-	for ( var id in players.players ) {
-		if ( id == user.id ) continue;
-		players.players[id].update({
-			delta: delta,
-			input: {
-				up: false,
-				left: true,
-				space: false,
-				right: false,
-				tab : false
-			}
-		});
+	
+
+	var newInput = {
+		input : input.getInput(),
+		seq : input.getSeq(),
+		delta : delta
+	};
+
+	user.inputs.push(newInput);
+	socket.emit('input', newInput);
+
+	// update all players
+	for (var i = 0, l = players.players.length; i<l; i++) {
+		players.players[i].update(delta);
 	}
-	user.update({
-		delta : delta,
-		input : input()
-	});
+
+	// update user onscreen stats
+	playerStats.update(user);
+
+	// Loop the background
+	background.update(user.ship.position);
+
+	// Update Camera
+	camera.update(user.ship.position);
+
+	// Update the minimap camera
+	mm.camera.update(user.ship.position);
+	// Renderers
+	mm.renderer.render(mm.scene, mm.camera);
 	renderer.render(scene, camera);
 	soundRenderer.render( scene, camera );
+
+	// Recursion
 	requestAnimationFrame( play );
-};
+
+	$('#testvar').text('deaths:' + user.deaths + ' kills:' + user.kills +'\n x:' + Math.floor(user.ship.position.x) + ' y:' + Math.floor(user.ship.position.y));
+
+}
 
 
-init();
 
 
 
-
-
-},{"./background.js":2,"./camera.js":3,"./input.js":7,"./lasers":9,"./lighting.js":10,"./players.js":12,"./renderer.js":13,"./vendor/THREEx.js":19}],7:[function(require,module,exports){
+},{"./background.js":2,"./camera.js":3,"./input.js":7,"./lasers":8,"./lighting.js":9,"./mm.js":10,"./playerStats.js":12,"./players.js":13,"./renderer.js":14,"./vendor/THREEx.js":19}],7:[function(require,module,exports){
 
 var KeyboardState = require('./vendor/THREEx.js').KeyboardState;
 var keyboard = new KeyboardState();
 
-module.exports = function () {
-	return {
-		up : keyboard.pressed("up"),
-		left : keyboard.pressed("left"),  
-		right: keyboard.pressed("right"),
-		space : keyboard.pressed("space"),
-		tab : keyboard.pressed("tab")
-	};
+module.exports = {
+
+    inputSeq : 0,
+
+	getInput :  function() {
+
+		 return  {
+			up : keyboard.pressed("up"),
+			left : keyboard.pressed("left"),  
+			right: keyboard.pressed("right"),
+			space : keyboard.pressed("space"),
+			tab : this.keyUp("tab")
+		};
+		
+	},
+
+	getSeq : function() {
+		this.inputSeq += 1;
+		return this.inputSeq;
+	},
+
+	keyUp : function(key) {
+		if (this.lastDown[key] === undefined) {
+			this.lastDown[key] = false;
+		}
+		if (!keyboard.pressed(key)) {
+			if (this.lastDown[key]) {
+				this.lastDown[key] = false;
+				return true;
+			} else 
+				return false;
+		} else {
+			this.lastDown[key] = true;
+			return false;
+		}
+	},
+
+	lastDown : {}
+
 };
-
 },{"./vendor/THREEx.js":19}],8:[function(require,module,exports){
-
-},{}],9:[function(require,module,exports){
 var Laser = require('./Laser.js');
-function lasers (scene) {
 
-	this.scene = scene;
+function lasers () {
+  	THREE.Object3D.call(this);
+}
 
-	this.lasers = [];
+lasers.prototype = new THREE.Object3D();
+lasers.prototype.constructor = lasers;
 
-	this.update = update;
-
-	this.newLaser = newLaser;
-
-	function update(delta) {
-
-		var self = this;
-		var i = this.lasers.length;
-		while(i > 0) {
-			i--;
-			var laser = this.lasers[i];
-
-			if ( laser.timeTraveled < laser.stats.range ) {
-
-				if (!laser.isDead) {
-
-					laser.position.x += delta * laser.velocity.x;
-					laser.position.y += delta * laser.velocity.y;
-					laser.timeTraveled += delta * 1;
-					
-					// Test for Collision with players
-					for ( var id in players.players ) {
-						var ship = players.players[id].ship;
-						var d = laser.position.distanceTo(ship.position);
-					    if ( d < ship.stats.hitBoxRadius ) 
-					    {
-					    	ship.takeDmg(laser.stats.dmg);
-					    	laser.visible = false;
-					    	laser.isDead = true;
-					    }
-					}
+lasers.prototype.update = function(delta) {
+	var i = this.children.length;
+	while(i > 0) {
+		i--;
+		var laser = this.children[i];
+		if ( laser.timeTraveled < laser.stats.range ) { // if laser has not hit max range
+			if (!laser.isDead) { // If laser is not dead (scheduled for removal)
+				laser.move(delta); // Move the laser
+				if (laser.testCollision()) {
+					this.remove(laser);
+					// TODO: Not garunteed to remove the right element as we add more sounds
+					$( "audio" ).first().remove();
 				}
 			}
-			else {
-				scene.remove(laser);
-				this.lasers.splice(i,1);
-				// TODO: Not garunteed to remove the right element as we add more sounds
-				$( "audio" ).first().remove();
-			}
+		} else {
+			this.remove(laser);
+			// TODO: Not garunteed to remove the right element as we add more sounds
+			$( "audio" ).first().remove();
 		}
 	}
+};
 
-	function newLaser (position, rotation, velocity) {
-		
-		this.lasers.push(new Laser(position, rotation, velocity));
-		scene.add(this.lasers[this.lasers.length - 1]);
+lasers.prototype.newLaser = function (position, rotation, velocity, owner, timeTraveled) {
+	var laser = new Laser(position, rotation, velocity, owner, timeTraveled);
+	this.add(laser);
+};
 
-	}
-}
+lasers.prototype.newLaserFromServer = function(data) {
+	console.log('laser added');
+	var laser = new Laser(data.owner.ship.position, data.owner.ship.rotation.z, data.owner.ship.velocity, data.owner);
+	this.add(laser);
+};
+
+
+
 module.exports = lasers;
-},{"./Laser.js":1}],10:[function(require,module,exports){
+},{"./Laser.js":1}],9:[function(require,module,exports){
 // Player lighting setup
 
 
@@ -422,168 +513,241 @@ hemiLight.color.setHSL( 0.6, 1, 0.6 );
 hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
 hemiLight.position.set( 500, 500, 0 );
 
-var key = new THREE.DirectionalLight( 0xffffff, 0.3 );
-key.position.set( -2, -2, 3 );
-key.position.multiplyScalar( 30 );
-key.castShadow = true;
-var d = 5;
-key.shadowCameraLeft = -d;
-key.shadowCameraRight = d;
-key.shadowCameraTop = d;
-key.shadowCameraBottom = -d;
-key.shadowDarkness = 0.5;
-
 
 lighting = new THREE.Object3D(); // Add the lights to a container object
-lighting.add(key);
 lighting.add(hemiLight);
 
 module.exports = lighting;
+},{}],10:[function(require,module,exports){
+var mm = {};
+
+mm.scene = new THREE.Scene();
+// Camera setup
+var width = 400, height = 400;
+
+mm.camera =  new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, 1, 1000 ); // Create Camera
+mm.camera.position.set(0, 0, 150); // Set camera above and behind the targt
+mm.camera.lookAt(new THREE.Vector3(0,0,0)); // Set camera to look at the target
+mm.camera.update = function(target) {
+	this.position.x = target.x;
+	this.position.y = target.y;
+};
+
+// Renderer Setup
+mm.renderer = new THREE.CanvasRenderer();
+mm.renderer.setSize(200, 200); 
+
+// Blip setup
+mm.blip = function() {
+  THREE.Sprite.call(this);
+
+  this.material = new THREE.SpriteMaterial({ 
+    map: THREE.ImageUtils.loadTexture( 'assets/mm-ship-dot.jpg' ),
+    transparent : true
+  });
+
+  this.scale.x = 7;
+  this.scale.y = 7;
+  this.scale.z = 7;
+};
+
+mm.blip.prototype = new THREE.Sprite(this.material);
+mm.blip.prototype.constructor = mm.blip;
+
+mm.blip.prototype.isBlinking = false;
+
+mm.blip.prototype.toggleBlink = function(t) {
+  var opt = t || this.isBlinking ? "off" : "on";
+  if (t === "off") {
+    this.isBlinking = false;
+  } else {
+    this.isBlinking = true;
+    this.blink();
+  }
+};
+
+mm.blip.prototype.blink = function() {
+  if ( !(this.isBlinking) )  {
+    this.visible = true;
+    return;
+  }
+  if (this.visible) this.visible = false;
+  else this.visible = true;
+  var self = this;
+  setTimeout(function() {
+    self.blink();
+  }, 300);
+};
+
+mm.blips = new THREE.Object3D();
+
+module.exports = mm;
 },{}],11:[function(require,module,exports){
 var ship = require('./ship.js');
 
 function player(id, name) {
-  	this.id = id;
-  	this.name = name;
-  	this.ship = new ship();
+	this.id = id;
+	this.name = name;
+  this.kills = 0;
+  this.deaths = 0;
+  this.ship = new ship();
+  this.inputs = [];
 }
 
 player.prototype = {
 
   ship : new ship(),
 
-  isUsersTarget : false,
-
-  input : {
-    up    : false,
-    down  : false,
-    left  : false,
-    right : false,
-    space : false,
-    reset : function () {
-      this.up = false;
-      this.down = false;
-      this.left = false;
-      this.right = false;
-      this.space = false;
-    }
-  },
+  serverUpdate : false,
 
   target : null,
 
-  selectTarget : function() {
-    
-    var self = this;
+  setTarget : function(target) {
+
+    // If a target is already selected untarget it
+    if (this.target !== null) this.target.ship.toggleTargeted();
+
+    // Set the new target
+    this.target = target;
+    this.target.ship.toggleTargeted();
+
+  },
+
+  unsetTarget : function() {
+    this.target.ship.toggleTargeted();
+    this.target = null;
+  },
+
+  nextTarget : function() {
+
     var target;
+    
+    // If no target is selected, target the next player after this player (the user)
     if ( this.target === null ) {
-      for ( var ids in players.players ) {
-        target = players.lookup(ids);
-        if ( target !== self ) return target;
+
+      target = players.nextPlayer(this);
+
+      // If the next player was also this player, then select no target
+      if (target === this) return; 
+    }
+
+    // If a target is selected, target the next player after the current target
+    else {
+      target = players.nextPlayer(this.target); 
+
+      // If the next player was also this player, then select no new target and deselect the current target
+      if (target === this) {
+        this.unsetTarget();
+        return;
       }
-    } else {
-      target = players.lookup(this.target.id + 1);
-      if ( typeof target !== undefined && target !== this )
-        return target;
-      else 
-        target = players.lookup(0);
-
-      if (target !== user) 
-          return target;
-      else 
-        return players.lookup(1);
     }
-    this.target = players.lookup(2);
-    this.target.isUsersTarget = true;
+
+    // Set the target if everything above gets through
+    this.setTarget(target);
 
   },
 
-  accelerate : function (delta) {
-    this.ship.velocity.x -= delta * this.ship.stats.accelRate *  Math.sin(this.ship.rotation.z); // Adjust X Velocity
-    this.ship.velocity.y += delta * this.ship.stats.accelRate *  Math.cos(this.ship.rotation.z); // Adjust Y Velocity
-    if ( this.ship.velocity.lengthSq() > Math.pow(this.ship.stats.maxSpeed, 2) ) // If the new velocity is too fast
-      this.ship.velocity.setLength(this.ship.stats.maxSpeed); // Bring it back to max speed
-  },
+  handleServerUpdate: function() {
 
-  turnLeft : function (delta) {
-    this.ship.rotateOnAxis( new THREE.Vector3(0,0,1), delta * Math.PI/180 * this.ship.stats.turnRate); // Rotate Left
-    if(this.ship.shipModel.rotation.z < this.ship.stats.maxBankAngle) { // If below max bank angle
-      this.ship.shipModel.rotation.z += this.ship.stats.maxBankAngle * 0.05; // Bank the ship a little
-      //this.ship.thrust.container.rotation.y -= this.ship.stats.maxBankAngle * 0.05; // Bank the thrust too
-    }
-  },
+    // Accept Server Position Information
+    this.ship.position.x = this.serverUpdate.ship.position.x;
+    this.ship.position.y = this.serverUpdate.ship.position.y;
+    this.ship.rotation.z = this.serverUpdate.ship.rotation;
+    this.ship.velocity.x = this.serverUpdate.ship.velocity.x;
+    this.ship.velocity.y = this.serverUpdate.ship.velocity.y;
+    this.ship.health = this.serverUpdate.ship.health;
+    this.ship.energy = this.serverUpdate.ship.energy;
 
-  turnRight: function (delta) {
-    this.ship.rotateOnAxis( new THREE.Vector3(0,0,-1), delta * Math.PI/180 * this.ship.stats.turnRate); // Rotate Right
-    if(this.ship.shipModel.rotation.z > -this.ship.stats.maxBankAngle) { // If below max bank angle
-      this.ship.shipModel.rotation.z -= this.ship.stats.maxBankAngle * 0.05; // Bank the ship a little
-      //this.ship.thrust.container.rotation.y += this.ship.stats.maxBankAngle * 0.05; // Bank the thrust too
-    }
-  },
+    if ( this.serverUpdate.ship.isExploding ) this.ship.explode();
 
-  canFire : true,
+    if (this.inputs.length > 0) {
+    
+      var lastSeqIndex = -1;
 
-  fireLaser : function (delta) {
-    var self = this;
-    if ( self.canFire ) {
-      lasers.newLaser(this.ship.position, this.ship.rotation.z, this.ship.velocity);
-      this.canFire = false;
-      setTimeout(function() {
-        self.canFire = true;
-      }, 100);
-    }
-  },
-
-  update: function(update) {
-
-      if (this.isUsersTarget) {
-        this.ship.healthbar.visible = true;
-      } else {
-        this.ship.healthbar.visible = false;
-      }
-
-      var self = this;
-      if(this.ship.isExploding) {
-        this.ship.explosion.update(update.delta);
-        if( this.ship.explosion.currentTile == 13 ) {
-          this.ship.shipModel.visible = false;
-          setTimeout( function() {
-            players.deletePlayer(self.id);
-          }, 500);
+      // Find and store the input index that the update from the server is associated with
+      for(var i = 0, l = this.inputs.length; i < l; ++i) {
+        if ( this.inputs[i].seq == this.serverUpdate.seq ) {
+          lastSeqIndex = i;
+          break;
         }
       }
 
-      if (update.input.tab) {
-        this.target = this.selectTarget();
-      }
-      if (update.input.up) {
-        this.accelerate(update.delta);
-        //this.ship.thrust.on();
-      } else {
-        //this.ship.thrust.off();
-      }
-      if (update.input.left) {
-        this.turnLeft(update.delta);
-      }
-      if (update.input.right) {
-        this.turnRight(update.delta);
-      }
-      if (!update.input.left && !update.input.right ) {
-        if (this.ship.shipModel.rotation.z > 0) {
-          this.ship.shipModel.rotation.z -= this.ship.stats.maxBankAngle * 0.05;
-          //this.ship.thrust.container.rotation.y += this.ship.stats.maxBankAngle * 0.05;
-        }
-        if (this.ship.shipModel.rotation.z < 0) {
-          this.ship.shipModel.rotation.z += this.ship.stats.maxBankAngle * 0.05;
-          //this.ship.thrust.container.rotation.y -= this.ship.stats.maxBankAngle * 0.05;
-        }
-      } 
-      if (update.input.space) {
-        this.fireLaser();
+      // Assuming we found a matching input seq from the server, dump everything before it
+      if(lastSeqIndex != -1) {
+        var numberToClear = Math.abs(lastSeqIndex + 1);
+        this.inputs.splice(0, numberToClear);
       }
 
-    this.ship.position.x += update.delta * this.ship.velocity.x;
-    this.ship.position.y += update.delta * this.ship.velocity.y;
+      // For each remaining input reprocess positioning except last
+      for(i = 0, l = this.inputs.length - 1; i<l; i++) {
+        
+        var input = this.inputs[i].input;
+        var delta = this.inputs[i].delta;
+        if (input.up) this.ship.accelerate(delta);
+        if (input.left) this.ship.turnLeft(delta);
+        if (input.right) this.ship.turnRight(delta);
+        this.ship.move(delta);
 
+      }
+
+      this.handleInput(this.inputs[this.inputs.length - 1]);
+
+    }
+
+    // Clear server update
+    this.serverUpdate = false;
+
+
+  },
+
+  handleInput : function(input) {
+    if (input.input.up) this.ship.accelerate(input.delta);
+    if (input.input.left) this.ship.turnLeft(input.delta);
+    if (input.input.right) this.ship.turnRight(input.delta);
+    if (!input.input.left && !input.input.right ) this.ship.resetBankAngle(input.delta);
+    if (input.input.tab) this.nextTarget();
+    if (input.input.space) this.ship.fireLaser(this);
+  },
+
+  update: function(delta) {
+
+    // If the player's ship is flagged as dead do nothing
+    if (this.ship.isDead) return;
+
+      if (this.ship.health <= 0 &&  !this.ship.isExploding ) {
+        this.ship.explode();
+      }
+
+      // If the player's ship has a target, and the target's ship is dead, reset this players target to null
+      if (this.target && this.target.ship.isDead) this.target = null;
+
+      // Check for an update from the server, and recalculate position based on server position or just do local positioning
+      if (this.serverUpdate) this.handleServerUpdate();
+      else if (this.inputs.length > 0) this.handleInput(this.inputs[this.inputs.length - 1]);
+
+      // Regen the ship's hp and energy
+      this.ship.regen(delta);
+
+      // Move the ship
+      this.ship.move(delta);
+
+      // Handle Explosion
+      if (this.ship.isExploding) {
+
+        // Progress Explosion Frames
+        this.ship.explosion.update(delta);
+        
+        // Hide this player's ship when the explosion gets to frame 13 (largest part of animation)
+        if( this.ship.explosion.currentTile == 13 ) this.ship.shipModel.visible = false;
+
+        // Remove this player's ship when explosion is over and increase this players death count
+        if ( this.ship.explosion.isOver ) { 
+          players.removeShip(this.ship);
+          this.ship.isDead = true;
+          this.deaths++;
+        }
+
+      }
   }
 
 };
@@ -592,43 +756,105 @@ module.exports = player;
 
 
 },{"./ship.js":15}],12:[function(require,module,exports){
+module.exports = function() {
 
+	var hp = document.getElementById('playerHP');
+	var energy = document.getElementById('playerEnergy');
+	hp.width = energy.width = 199;
+	hp.height = energy.height = 12;
+
+	var energyContext = energy.getContext('2d');
+	var hpContext = hp.getContext('2d');
+
+	this.bar = {
+	    x: 1,
+	    y: 1,
+	    width: 200,
+	    height: 10
+	};
+
+	this.update = update;
+
+
+	function update(player) {
+		// Clear the canvas
+		hp.width = hp.width;
+		energy.width = energy.width;
+
+		var health = player.ship.health / player.ship.stats.maxHealth;
+		var e = player.ship.energy / player.ship.stats.maxEnergy;
+		if ( e > 0 ) {
+
+			var g = Math.floor(255 * e);
+			var gs = g.toString();
+
+			energyContext.fillStyle = 'rgb(0,' + gs + ',255)';
+			energyContext.fillRect(this.bar.x, this.bar.y, this.bar.width * e, this.bar.height);			
+		}
+		if ( health > 0 ) {
+			hpContext.fillStyle = "#" + player.ship.healthbar.material.color.getHexString();
+			hpContext.fillRect(this.bar.x, this.bar.y, this.bar.width * health, this.bar.height);
+		}
+	}
+
+};
+},{}],13:[function(require,module,exports){
 var player = require('./player.js');
 
-function players(scene) {
 
-  var self = this;
+var players = {
 
-  this.players = {};
-  this.allPlayerShips = [];
+    players: [],
 
-  this.scene = scene;
+    ships: new THREE.Object3D(),
 
-  this.lookup = lookup;
-  this.deletePlayer = deletePlayer;
-  this.addPlayer = addPlayer;
+    lookup: function(id) {
+      var playerIndex = this.players.map(function(x) {return x.id; }).indexOf(id);
+      return this.players[playerIndex];
+    },
 
-  function lookup(id) {
-    return self.players[id];
-  }
-  function deletePlayer(id) {
-    self.scene.remove(self.players[id].ship);
-    delete self.players[id];
-  }
-  function addPlayer(id, name) {
-    self.players[id] = new player(id, name);
-    self.scene.add(self.players[id].ship);
-    self.allPlayerShips.push(self.players[id].ship);
-    return self.players[id];
-  }
-}
+    removePlayer: function(id) {    
+      var playerIndex = this.players.map(function(x) {return x.id; }).indexOf(id);
+      this.ships.remove(this.players[playerIndex].ship);
+      mm.blips.remove(this.players[playerIndex].ship.blip);
+      this.players.splice(playerIndex, 1);
+    },
+
+    addPlayer: function(id, name) {
+      var playerIndex = this.players.push(new player(id, name));
+      var newPlayer = this.players[playerIndex - 1];
+      this.addShip(newPlayer.ship);
+      return newPlayer;
+    },
+
+    removeShip: function(ship) {
+      this.ships.remove(ship);
+      mm.blips.remove(ship.blip);
+    },
+
+    addShip: function(ship, position) {
+      this.ships.add(ship);
+      mm.blips.add(ship.blip);
+      var p = position || new THREE.Vector3();
+      ship.position.x = p.x;
+      ship.position.y = p.y;
+      ship.reset();
+    },
+
+    nextPlayer: function(player) {
+      var i = this.players.indexOf(player);
+      if(i >= 0 && i < this.players.length - 1)
+        return this.players[i + 1];
+      else
+        return this.players[0];
+    }
+};
 
 module.exports = players;
 
   
 
-},{"./player.js":11}],13:[function(require,module,exports){
-
+},{"./player.js":11}],14:[function(require,module,exports){
 var Detector = require('./vendor/Detector.js');
 
 if ( Detector.webgl ) 
@@ -640,78 +866,198 @@ renderer.setSize(window.innerWidth, window.innerHeight); // set renderer size ba
 renderer.shadowMapEnabled = true; // Shadows allowed
 
 module.exports = renderer;
-},{"./vendor/Detector.js":17}],14:[function(require,module,exports){
-module.exports = new THREE.Scene();
-},{}],15:[function(require,module,exports){
-// Camera setup
+},{"./vendor/Detector.js":17}],15:[function(require,module,exports){
 var Explosion = require('./explosion.js');
 var Healthbar = require('./healthbar.js');
+var mm    = require('./mm.js');
 
-// Ship Constructor
 function ship() {
 
-  	THREE.Object3D.call(this);
-  	this.velocity = new THREE.Vector3();
+	THREE.Object3D.call(this);
+  var self = this;
 
-  	var _this = this;
+  // Load ship model
+  this.loader.load( "assets/ship.js", function(geometry, materials) {
+		var material = new THREE.MeshFaceMaterial( materials );
+		self.shipModel = new THREE.Mesh( geometry, material );
+		self.shipModel.rotateOnAxis( new THREE.Vector3(1,0,0), Math.PI / 2);
+		self.add(self.shipModel);
 
-  	this.shipModel = new THREE.Mesh();
+    var key = new THREE.DirectionalLight( 0xffffff, 0.3 );
+    key.position.set( -2, -2, 3 );
+    key.position.multiplyScalar( 30 );
+    key.castShadow = true;
+    var d = 5;
+    key.shadowCameraLeft = -d;
+    key.shadowCameraRight = d;
+    key.shadowCameraTop = d;
+    key.shadowCameraBottom = -d;
+    key.shadowDarkness = 0.5;
 
-    this.stats.health = this.stats.startHealth;
+    self.add(key);
+    self.add(hemiLight);
 
-  	var jsonLoader = new THREE.JSONLoader();
+  });
 
-    jsonLoader.load( "assets/ship.js", function(geometry, materials) {
-  		var material = new THREE.MeshFaceMaterial( materials );
-  		_this.shipModel = new THREE.Mesh( geometry, material );
-  		_this.shipModel.rotateOnAxis( new THREE.Vector3(1,0,0), Math.PI / 2);
-  		_this.add(_this.shipModel);
-    });
+  // Generate the healthbar
+  this.healthbar = new Healthbar();
+  this.add(this.healthbar);
 
-    this.targeted = false;
-    this.healthbar = new Healthbar();
-    this.add(this.healthbar);
+  // Generate the minimap blip
+  this.blip = new mm.blip();
 
+  // Create a unique velocity vector for movement calculation
+  this.velocity = new THREE.Vector3();
+
+  // Create unique health and energy properties
+  this.health = this.stats.maxHealth;
+  this.energy = this.stats.maxEnergy;
 
 }
 
 ship.prototype = new THREE.Object3D();
 ship.prototype.constructor = ship;
 
-ship.prototype.explode = function() {
-  this.isExploding = true;
-  this.explosion = new Explosion();
-  this.add(this.explosion);
-};
-ship.prototype.isExploding = false;
+// Setup stuff
+ship.prototype.loader = new THREE.JSONLoader();
+ship.prototype.shipModel = new THREE.Mesh();
+
+// Shared stats
 ship.prototype.stats = {
-  startHealth : 300,
-  regen : 1, // Points Per Second  
-  hitBoxRadius    : 2.75,
-  turnRate  : 220,  // DEGREES PER SECOND
-  accelRate : 35, // METERS PER SECOND PER SECOND
-  maxSpeed  : 40,  // METERS PER SECOND
-  maxBankAngle : 0.3,
-  bankAngle: 0  // BANKING ANGLE * GRAPHIC EFFECT ONLY *
+  maxEnergy    : 72,   // Max Energy
+  maxHealth    : 300,  // Max HP
+  regen        : 10,   // Regen per second
+  hitBoxRadius : 2.75, // Unit size of hit box radius
+  turnRate     : 220,  // Degrees per second
+  accelRate    : 35,   // Units per second per second
+  maxSpeed     : 40,   // Units per second
+  maxBankAngle : 0.3,  // Maximum banking angle
+  bankAngle    : 0     // Current bank angle
 };
 
-ship.prototype.takeDmg = function(dmg) {
-  this.stats.health -= dmg;
-  if (this.stats.health >= 0) 
-    this.healthbar.setHealth(this.stats.health/this.stats.startHealth);
-  if (this.stats.health <= 0) {
-    if (!this.isExploding)
+// Flags
+ship.prototype.isExploding = false;
+ship.prototype.canFire = true;
+ship.prototype.isTargeted = false;
+ship.prototype.isDead = false;
+ship.prototype.turning = false;
+
+// Methods
+ship.prototype.takeDmg = function(dmg, player) {
+  this.health -= dmg;
+  this.healthbar.setHealth(this.health/this.stats.maxHealth);
+  if (this.health <= 0 && !this.isExploding) {
     this.explode();
+    player.kills++;
   }
 };
 
+ship.prototype.regen = function(delta) {
+  if ( this.energy < this.stats.maxEnergy ) {
+    this.energy += this.stats.regen * delta;
+    if ( this.energy > this.stats.maxEnergy ) this.energy = this.stats.maxEnergy;
+  }
+  if ( this.health < this.stats.maxHealth ) {
+    this.health += this.stats.regen * delta;
+    if ( this.health > this.stats.maxHealth ) this.health = this.stats.maxHealth;
+  }
+  this.healthbar.setHealth(this.health/this.stats.maxHealth);
+};
 
+ship.prototype.reset = function() {
+  this.isExploding = false;
+  this.canFire = true;
+  this.isDead = false;
+  this.isTargeted = false;
+  this.health = this.stats.maxHealth;
+  this.energy = this.stats.maxEnergy;
+  this.shipModel.visible = true;
+  this.velocity.x = 0;
+  this.velocity.y = 0;
+  this.rotation.z = 0;
+  this.remove(this.explosion);
+};
 
+ship.prototype.explode = function() {
+  this.isExploding = true;
+  this.healthbar.visible = false;
+  this.explosion = new Explosion();
+  this.add(this.explosion);
+};
 
+ship.prototype.fireLaser = function(player) {
+  var self = this;
+  if ( this.energy >= 3 && this.canFire ) {
+    lasers.newLaser(this.position, this.rotation.z, this.velocity, player);
+    this.canFire = false;
+    this.energy -= 3;
+    setTimeout(function() {
+        self.canFire = true;
+    }, 100);
+  }
+};
 
+ship.prototype.accelerate = function (delta) {
+  this.velocity.x -= delta * this.stats.accelRate *  Math.sin(this.rotation.z); // Adjust X Velocity
+  this.velocity.y += delta * this.stats.accelRate *  Math.cos(this.rotation.z); // Adjust Y Velocity
+  if ( this.velocity.lengthSq() > Math.pow(this.stats.maxSpeed, 2) ) // If the new velocity is too fast
+    this.velocity.setLength(this.stats.maxSpeed); // Bring it back to max speed
+};
+
+ship.prototype.turnLeft = function (delta) {
+  this.rotateOnAxis( new THREE.Vector3(0,0,1), delta * Math.PI/180 * this.stats.turnRate); // Rotate Left
+  if(this.shipModel.rotation.z < this.stats.maxBankAngle) { // If below max bank angle
+    this.shipModel.rotation.z += this.stats.maxBankAngle * 5 * delta; // Bank the ship a little
+  }
+};
+
+ship.prototype.turnRight = function (delta) {
+  this.rotateOnAxis( new THREE.Vector3(0,0,-1), delta * Math.PI/180 * this.stats.turnRate); // Rotate Right
+  if(this.shipModel.rotation.z > -this.stats.maxBankAngle) { // If below max bank angle
+    this.shipModel.rotation.z -= this.stats.maxBankAngle *  5 * delta; // Bank the ship a little
+  }
+};
+
+ship.prototype.resetBankAngle = function (delta) {
+  if (this.shipModel.rotation.z > 0) 
+    this.shipModel.rotation.z -= this.stats.maxBankAngle * 5 * delta;
+  if (this.shipModel.rotation.z < 0) 
+    this.shipModel.rotation.z += this.stats.maxBankAngle * 5 * delta;
+};
+
+ship.prototype.move = function(delta) {
+    this.position.x += delta * this.velocity.x;
+    this.position.y += delta * this.velocity.y;
+    this.blip.position.x = this.position.x;
+    this.blip.position.y = this.position.y;
+};
+
+ship.prototype.toggleTargeted = function() {
+  if (this.isTargeted) {
+    this.isTargeted = false;
+    this.blip.toggleBlink("off");
+    this.healthbar.visible = false;
+  } else {
+    this.isTargeted = true;
+    this.blip.toggleBlink("on");
+    this.healthbar.visible = true;
+  }
+};
+
+ship.prototype.updateFromServer = function(update) {
+
+    this.position.x = update.position.x;
+    this.position.y = update.position.y;
+    this.rotation.z = update.rotation;
+    this.velocity.x = update.velocity.x;
+    this.velocity.y = update.velocity.y;
+    this.health = update.health;
+    this.energy = update.energy;
+
+};
 
 module.exports = ship;
-},{"./explosion.js":4,"./healthbar.js":5}],16:[function(require,module,exports){
+},{"./explosion.js":4,"./healthbar.js":5,"./mm.js":10}],16:[function(require,module,exports){
 SPARKS = require('./Sparks.js');
 
 (function(){ 
@@ -2806,4 +3152,4 @@ THREE.Sound3D.prototype.update=function(a,b,c){
 	for(a=0;a<d;a++)
 		this.children[a].update(this.globalMatrix,b,c)
 };
-},{}]},{},[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25]);
+},{}]},{},[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]);

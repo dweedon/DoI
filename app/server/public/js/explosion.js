@@ -36,6 +36,8 @@ Explosion.prototype.constructor = Explosion;
 
 Explosion.prototype.currentDisplayTime = 0;
 Explosion.prototype.currentTile = 0;
+Explosion.prototype.numberOfTiles = 24;
+Explosion.prototype.isOver = false;
 Explosion.prototype.tileDisplayDuration = 50;
 
 Explosion.prototype.update = function(delta) {
@@ -44,11 +46,10 @@ Explosion.prototype.update = function(delta) {
 	if (this.currentTile == 5) this.startSound.play();
 	while (this.currentDisplayTime > this.tileDisplayDuration)
 	{
+		if (this.currentTile === this.numberOfTiles) this.isOver = true;
 		this.visible = true;
 		this.currentDisplayTime -= this.tileDisplayDuration;
 		this.currentTile++;
-		if (this.currentTile == this.numberOfTiles)
-			this.currentTile = 0;
 		var currentColumn = this.currentTile % 5;
 		this.texture.offset.x = currentColumn / 5;
 

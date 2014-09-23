@@ -25,6 +25,40 @@ body > div:after {
 	display: block;
 }
 
+#game canvas:last-of-type {
+	position: fixed;
+	top: 0;
+	right: 0;
+	z-index: 100;
+	border: 1px solid #464646;
+	border-top: 0px;
+	border-right: 0px;
+	box-shadow: 1px -1px 0 #272727 inset;
+	background-color: #000;
+	border-bottom-left-radius: 3px;
+}
+
+#playerHP {
+	z-index: 999;
+	position: fixed;
+	top: 205px;
+	right: 0;
+	border: 1px solid #464646;
+	box-shadow: 1px -1px 0 #272727 inset;
+	border-right: 0px;
+	background-color: #111;
+}
+#playerEnergy {
+	z-index: 999;
+	position: fixed;
+	top: 220px;
+	right: 0;
+	border: 1px solid #464646;
+	box-shadow: 1px -1px 0 #272727 inset;
+	border-right: 0px;
+	background-color: #111;
+}
+
 #login {
 	display: block;
 	float: left;
